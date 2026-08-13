@@ -346,6 +346,29 @@ export function apply(ctx) {
     return lines.join('\n').trim()
   }
 
+  function fmtDatetime(text, asJson) {
+    if (asJson) return text
+    try {
+      const data = JSON.parse(text)
+      const d = data && typeof data === 'object' ? (data.data || data) : data
+      if (d && typeof d === 'object') {
+        const lines = []
+        if (typeof d.title === 'string' && d.title.length > 0) lines.push('title: ' + d.title)
+        if (typeof d.description === 'string' && d.description.length > 0 && d.description !== d.title) lines.push('description: ' + String(d.description).slice(0, 200))
+        const times = []
+        const mk = d.metadata && typeof d.metadata === 'object' ? d.metadata : {}
+        for (const k of ['publishedTime', 'article:published_time', 'bytedance:published_time', 'article:modified_time', 'bytedance:updated_time']) {
+          const v = typeof mk[k] === 'string' ? mk[k] : (typeof d[k] === 'string' ? d[k] : undefined)
+          if (v !== undefined && v.length > 0) times.push(k + ': ' + v)
+        }
+        if (times.length > 0) lines.push(times.join(' | '))
+        if (typeof d.url === 'string' && d.url.length > 0) lines.push('url: ' + d.url)
+        if (lines.length > 0) return lines.join('\n')
+      }
+    } catch (e) { /* fall through */ }
+    return text
+  }
+
   function fmtScreenshot(text) {
     try {
       const data = JSON.parse(text)
@@ -583,6 +606,7 @@ export function apply(ctx) {
       additionalProperties: false,
       properties: {
         url: { type: 'string', description: 'Page URL, starting with http:// or https://.' },
+        json: { type: 'boolean', description: 'Return the raw JSON response instead of the extracted title/datetime.' },
       },
       required: ['url'],
     },
@@ -596,7 +620,7 @@ export function apply(ctx) {
         body: { url: String(args.url) }, timeoutMs: 60000, needsKey: false, signal,
       })
       if (!res.ok) return describeJinaError(res)
-      return res.text
+      return fmtDatetime(res.text, args.json === true)
     },
   })
 
