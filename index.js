@@ -70,6 +70,7 @@ export function apply(ctx) {
   let nodePath
   let fileKeyCache = { text: undefined, at: 0 }
   let keyDiag = ''
+  let keyKind
   let proxyCache = { text: undefined, at: 0, done: false }
   let currentCwd = undefined
 
@@ -163,6 +164,7 @@ export function apply(ctx) {
   /** API key: credential, then workspace file, then dsh-home file. */
   async function loadKey() {
     let value
+    let kind
     const attempts = []
     try {
       const svc = ctx.get('credentials')
@@ -172,6 +174,7 @@ export function apply(ctx) {
         const resolved = await svc.resolve(CRED_REF)
         if (resolved && resolved.value) {
           value = resolved.value
+          kind = 'credential'
           attempts.push('credential ' + CRED_REF + ': found (source ' + String(resolved.source) + ')')
         } else {
           attempts.push('credential ' + CRED_REF + ': not set')
@@ -185,6 +188,7 @@ export function apply(ctx) {
       if (fileKeyCache.text !== undefined && Date.now() - fileKeyCache.at < 30000) {
         attempts.push('file cache: hit')
         value = fileKeyCache.text
+        kind = 'file'
       } else {
         const root = resolveRoot()
         const home = dshHome()
@@ -200,7 +204,7 @@ export function apply(ctx) {
             const target = await ctx.fs.resolve(c.path, c.opts)
             const raw = await ctx.fs.readText(target)
             const trimmed = String(raw).trim()
-            if (trimmed !== '') { value = trimmed; attempts.push(c.kind + ': found'); break }
+            if (trimmed !== '') { value = trimmed; kind = 'file'; attempts.push(c.kind + ': found'); break }
             attempts.push(c.kind + ': empty file')
           } catch (err) {
             attempts.push(c.kind + ': ' + String((err && err.message) || err))
@@ -210,6 +214,7 @@ export function apply(ctx) {
       }
     }
     keyDiag = 'credential ' + CRED_REF + ' | ' + attempts.join(' | ')
+    keyKind = kind
     return value
   }
 
@@ -789,5 +794,51 @@ export function apply(ctx) {
       if (!res.ok) return describeJinaError(res)
       return res.text
     },
+  })
+
+  // ---- web settings health-check endpoint -----------------------------------
+  // The Jina Tools card asks this route for the key's identity + balance
+  // (jina-cli `primer`). Registered when the deployment composes a web server
+  // (the web profile); profiles without one simply never get the route.
+  // The API key itself never leaves the host.
+  ctx.inject(['webServer'], (rpcCtx) => {
+    rpcCtx.webServer.register({
+      kind: 'exact',
+      path: '/api/dsh-jina/primer',
+      handler: async (req, res) => {
+        if (req.method !== 'GET') {
+          res.writeHead(405, { Allow: 'GET' })
+          res.end()
+          return
+        }
+        const key = await loadKey()
+        const out = await callJina({
+          url: READER, method: 'GET',
+          headers: { Accept: 'application/json' },
+          body: undefined, timeoutMs: 30000, needsKey: false, apiKey: key,
+        })
+        let payload
+        if (out.ok) {
+          try {
+            const data = JSON.parse(out.text)
+            const d = (data && typeof data === 'object' && data.data && typeof data.data === 'object') ? data.data : data
+            payload = {
+              ok: true,
+              status: out.status,
+              authenticatedAs: typeof d.authenticatedAs === 'string' ? d.authenticatedAs : '',
+              balanceLeft: typeof d.balanceLeft === 'number' ? d.balanceLeft : null,
+              keyFound: key !== undefined,
+              keyKind: keyKind,
+            }
+          } catch (err) {
+            payload = { ok: false, status: out.status, error: 'unexpected primer response shape: ' + String((err && err.message) || err) }
+          }
+        } else {
+          payload = { ok: false, status: out.status, error: describeJinaError(out) }
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
+        res.end(JSON.stringify(payload))
+      },
+    })
   })
 }

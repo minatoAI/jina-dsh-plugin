@@ -10,7 +10,11 @@
 // The card manages the `JINA_API_KEY` credential through the standard
 // credentials RPC domain: values cross the wire only on save
 // (credentials.set), and the page shows configured state, never the stored
-// value.
+// value. It also runs the key health check: a GET to the host-provided
+// `/api/dsh-jina/primer` route (registered by the bundle's host half when a
+// web server is composed), which answers with the key's Jina identity and
+// credit balance — the same data `jina_primer` reports. The key itself never
+// leaves the host.
 window.__ModuleLoader__.load({
   id: 'dsh-jina/ui',
   factory: function (require) {
@@ -30,9 +34,14 @@ window.__ModuleLoader__.load({
       input: { boxSizing: 'border-box', flex: 1, minWidth: 0, height: 36, borderRadius: 10, border: '1px solid rgba(127,127,127,0.35)', background: 'var(--dsw-alias-bg-layer-1, transparent)', color: 'var(--dsw-alias-label-primary)', padding: '0 12px', fontSize: 13, fontFamily: 'inherit', outline: 'none' },
       button: { boxSizing: 'border-box', height: 36, borderRadius: 10, border: 'none', padding: '0 18px', cursor: 'pointer', fontSize: 13, fontWeight: 500, background: 'var(--dsw-alias-interactive-bg-hover)', color: 'var(--dsw-alias-label-primary)', fontFamily: 'inherit' },
       ghostButton: { boxSizing: 'border-box', height: 36, borderRadius: 10, border: '1px solid rgba(127,127,127,0.35)', padding: '0 18px', cursor: 'pointer', fontSize: 13, fontWeight: 500, background: 'transparent', color: 'var(--dsw-alias-label-secondary, rgba(127,127,127,0.92))', fontFamily: 'inherit' },
+      smallButton: { boxSizing: 'border-box', height: 26, borderRadius: 8, border: '1px solid rgba(127,127,127,0.35)', padding: '0 10px', cursor: 'pointer', fontSize: 12, fontWeight: 500, background: 'transparent', color: 'var(--dsw-alias-label-secondary, rgba(127,127,127,0.92))', fontFamily: 'inherit' },
+      infoBox: { boxSizing: 'border-box', border: '1px solid rgba(127,127,127,0.25)', borderRadius: 12, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 },
+      infoHead: { display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between' },
+      infoLabel: { fontSize: 12, fontWeight: 500, color: 'var(--dsw-alias-label-primary)', margin: 0 },
       status: { fontSize: 12, lineHeight: '18px', color: 'var(--dsw-alias-label-secondary, rgba(127,127,127,0.92))', margin: 0 },
       statusOk: { fontSize: 12, lineHeight: '18px', color: 'var(--dsw-alias-status-success, #2f9e44)', margin: 0 },
       statusBad: { fontSize: 12, lineHeight: '18px', color: 'var(--dsw-alias-status-danger, #e03131)', margin: 0 },
+      mono: { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace', fontSize: 12, lineHeight: '18px', color: 'var(--dsw-alias-label-primary)', margin: 0, wordBreak: 'break-all' },
       note: { fontSize: 12, lineHeight: '18px', color: 'var(--dsw-alias-label-tertiary, rgba(127,127,127,0.6))', margin: 0 },
       link: { color: 'var(--dsw-alias-label-link, var(--dsw-alias-label-primary))', textDecoration: 'underline', cursor: 'pointer' },
     }
@@ -56,6 +65,7 @@ window.__ModuleLoader__.load({
       var [status, setStatus] = React.useState('')
       var [statusKind, setStatusKind] = React.useState('info') // 'info' | 'ok' | 'bad'
       var [view, setView] = React.useState(undefined) // {configured, writable} | undefined while loading
+      var [primer, setPrimer] = React.useState({ phase: 'loading', data: undefined, error: undefined })
 
       var refresh = function () {
         api.credentials.describe({ refs: [CRED] }).then(function (response) {
@@ -64,10 +74,24 @@ window.__ModuleLoader__.load({
         }, function () { /* keep previous view */ })
       }
 
+      var loadPrimer = function () {
+        setPrimer({ phase: 'loading', data: undefined, error: undefined })
+        fetch('/api/dsh-jina/primer').then(function (r) { return r.json() }).then(function (payload) {
+          if (payload && payload.ok === true) setPrimer({ phase: 'ok', data: payload, error: undefined })
+          else setPrimer({ phase: 'error', data: undefined, error: (payload && payload.error) || 'HTTP ' + (payload && payload.status) })
+        }, function (err) {
+          setPrimer({ phase: 'error', data: undefined, error: String((err && err.message) || err) })
+        })
+      }
+
       React.useEffect(function () {
         refresh()
+        loadPrimer()
         var dispose = remote.$on('credentials/updated', function (ref) {
-          if (ref === CRED) refresh()
+          if (ref === CRED) {
+            refresh()
+            loadPrimer()
+          }
         })
         return dispose
       }, [api, remote])
@@ -88,6 +112,7 @@ window.__ModuleLoader__.load({
             setStatus('已保存。')
             setInput('')
             refresh()
+            loadPrimer()
           } else {
             setStatusKind('bad')
             setStatus('保存失败：' + String((response.result.error && response.result.error.message) || '未知错误'))
@@ -106,6 +131,7 @@ window.__ModuleLoader__.load({
             setStatusKind('ok')
             setStatus('已清除。')
             refresh()
+            loadPrimer()
           } else {
             setStatusKind('bad')
             setStatus('清除失败：' + String((response.result.error && response.result.error.message) || '未知错误'))
@@ -124,6 +150,39 @@ window.__ModuleLoader__.load({
           ? 'API key 已保存（来源：' + String(view.source || '本机存储') + '）。粘贴新 key 并保存即可覆盖。'
           : '尚未保存 API key。'
       var statusStyle = statusKind === 'ok' ? S.statusOk : (statusKind === 'bad' ? S.statusBad : S.status)
+
+      // ---- key health block -------------------------------------------------
+      var primerLines
+      if (primer.phase === 'loading') {
+        primerLines = [React.createElement('p', { key: 'p', style: S.status }, '正在连接 Jina 检测 key…')]
+      } else if (primer.phase === 'error') {
+        primerLines = [
+          React.createElement('p', { key: 'e', style: S.statusBad }, '❌ 无法连接 Jina：' + String(primer.error)),
+          React.createElement('p', { key: 'h', style: S.note }, '请确认 VPN / 系统代理已开启，然后点击右侧「刷新」重试。'),
+        ]
+      } else {
+        var d = primer.data || {}
+        var balance = typeof d.balanceLeft === 'number' ? d.balanceLeft.toLocaleString('en-US') + ' credits' : '未知'
+        var kindLabel = d.keyFound === true
+          ? (d.keyKind === 'credential' ? '本页保存的 key' : 'key 文件（jina-api-key.txt）')
+          : '未检测到 key（Jina 匿名免费配额）'
+        primerLines = [
+          React.createElement('p', { key: 'ok', style: S.statusOk }, '✅ 连接正常，key 可用'),
+          React.createElement('p', { key: 'id', style: S.mono }, '身份：' + (d.authenticatedAs || '未知')),
+          React.createElement('p', { key: 'bal', style: S.mono }, '余额：' + balance),
+          React.createElement('p', { key: 'src', style: S.note }, '当前生效来源：' + kindLabel),
+        ]
+      }
+      var primerBlock = React.createElement('div', { style: S.infoBox },
+        React.createElement('div', { style: S.infoHead },
+          React.createElement('p', { style: S.infoLabel }, 'API key 检测'),
+          React.createElement('button', {
+            type: 'button',
+            style: S.smallButton,
+            onClick: loadPrimer,
+            disabled: primer.phase === 'loading',
+          }, '刷新')),
+        primerLines)
 
       return React.createElement('li', { style: S.card },
         React.createElement('button', {
@@ -160,6 +219,7 @@ window.__ModuleLoader__.load({
                 : null),
             status !== '' ? React.createElement('p', { style: statusStyle }, status) : null,
             React.createElement('p', { style: S.note }, shown),
+            primerBlock,
             view !== undefined && !writable ? React.createElement('p', { style: S.note }, '当前环境只读：key 由环境变量等来源提供，无法在此修改。') : null,
             React.createElement('p', { style: S.note }, 'key 解析顺序：1. 工具参数 apiKey；2. 本页保存的 key（credential 引用 ' + CRED + '，由 dsh 凭据存储持久化）；3. 会话工作区的 jina-api-key.txt；4. dsh 主目录下的 jina-api-key.txt。保存后立即生效。中国大陆网络环境下调用 Jina 需要 VPN；插件会自动发现并跟随系统代理（含代理端口变化）。'))
           : null)
