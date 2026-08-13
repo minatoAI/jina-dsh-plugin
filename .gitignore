@@ -1,0 +1,8 @@
+node_modules/
+.pnpm-store/
+*.log
+.DS_Store
+
+# 绝不要把 API key 提交进仓库
+jina-api-key.txt
+*.key

@@ -1,0 +1,37 @@
+{
+  "name": "dsh-jina",
+  "version": "0.1.0",
+  "description": "Jina AI tools for DeepSeek Harness: search, read, screenshot, embed, rerank, classify, pdf, expand, datetime, primer — with a settings-page API key UI.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./ui": "./ui/index.js",
+    "./ui/package.json": "./ui/package.json"
+  },
+  "files": [
+    "index.js",
+    "cordis.patch.yml",
+    "ui/index.js",
+    "ui/package.json",
+    "ui/client.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "license": "MIT",
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "jina",
+    "jina-ai",
+    "search",
+    "embedding",
+    "rerank",
+    "plugin"
+  ]
+}
