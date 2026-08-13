@@ -21,6 +21,8 @@
  */
 
 import { homedir } from 'node:os'
+import { createRequire } from 'node:module'
+import { pathToFileURL } from 'node:url'
 
 export const name = 'dsh-jina'
 
@@ -439,13 +441,37 @@ export function apply(ctx) {
 
   // ---- settings namespace (feeds the web settings page) --------------------
   const settingsService = ctx.get('settings')
+
+  /**
+   * Load `@deepseek-ai/schemastery` robustly.
+   *
+   * A git/npm install lands this package as a real directory inside the
+   * profile's node_modules, so a plain dynamic import resolves it through
+   * the profile's parent-walk (the healed `$DSH_HOME/profiles/node_modules`
+   * fallback carries schemastery as a dependency of the base bundle).
+   * A local `link:` install keeps this package's real path outside the
+   * profile, so the fallback anchors a createRequire at the dsh home
+   * instead — that walk always reaches `$DSH_HOME/profiles/node_modules`.
+   */
+  async function loadSchemastery() {
+    try {
+      const m = await import('@deepseek-ai/schemastery')
+      const z = m && (m.default ?? m.z ?? m)
+      if (z && typeof z.object === 'function') return z
+    } catch (err) { /* try the anchored fallback */ }
+    const req = createRequire(dshHome() + '/profiles/placeholder.cjs')
+    const entry = req.resolve('@deepseek-ai/schemastery')
+    const m = await import(pathToFileURL(entry).href)
+    const z = m && (m.default ?? m.z ?? m)
+    if (z === undefined || typeof z.object !== 'function') throw new Error('unexpected schemastery module shape')
+    return z
+  }
+
   const setupSettings = async () => {
     if (settingsService === undefined) return
     let z
     try {
-      const m = await import('@deepseek-ai/schemastery')
-      z = m.default ?? m.z ?? m
-      if (z === undefined || typeof z.object !== 'function') throw new Error('unexpected module shape')
+      z = await loadSchemastery()
     } catch (err) {
       try { ctx.logger.warn('dsh-jina: settings namespace disabled (schemastery unavailable): ' + String((err && err.message) || err)) } catch (e) { /* no logger */ }
       return

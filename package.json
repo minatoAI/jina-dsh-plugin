@@ -6,6 +6,7 @@
   "main": "index.js",
   "exports": {
     ".": "./index.js",
+    "./package.json": "./package.json",
     "./ui": "./ui/index.js",
     "./ui/package.json": "./ui/package.json"
   },
