@@ -61,7 +61,7 @@ dsh plugin --profile web add ./jina-dsh-plugin
 dsh --profile web
 ```
 
-Then open the Web UI → Settings → **Plugins** → **Configuration** tab → expand the **Jina Tools** card → paste your API key → Save. Get a free key at https://jina.ai/?sui=apikey.
+Then open the Web UI → Settings → **Plugins** → **Configuration** tab → expand the **Jina Tools** card → paste your API key → Save. Get a free key at https://jina.ai/.
 
 The card's **API key detection** section shows the current key's identity (Jina account) and balance (credits) in real time, and marks the key's source (saved on this page / key file / anonymous quota) so you can confirm the key is actually in effect; click **Refresh** to re-check (saving/clearing the key also triggers an automatic re-check). This data is served by the host-side plugin through the `/api/dsh-jina/primer` route (the same endpoint the `jina_primer` tool uses); **the plaintext key never leaves the host**.
 

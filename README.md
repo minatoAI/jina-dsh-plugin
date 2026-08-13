@@ -61,7 +61,7 @@ dsh plugin --profile web add ./jina-dsh-plugin
 dsh --profile web
 ```
 
-然后打开 Web 界面 → 设置 → **插件** → **配置** 选项卡 → 展开 **Jina Tools** 卡片 → 粘贴 API key → 保存。免费 key 在 https://jina.ai/?sui=apikey 获取。
+然后打开 Web 界面 → 设置 → **插件** → **配置** 选项卡 → 展开 **Jina Tools** 卡片 → 粘贴 API key → 保存。免费 key 在 https://jina.ai/ 获取。
 
 卡片中的 **API key 检测** 区域会实时显示当前 key 的身份（Jina 账号）与余额（credits），并标注 key 的来源（本页保存 / key 文件 / 匿名配额），用于确认 key 是否真正生效；点击「刷新」重新检测（保存/清除 key 后也会自动重检）。该数据由主机端插件通过 `/api/dsh-jina/primer` 路由提供（与 `jina_primer` 工具同一接口），**key 明文永不离开主机**。
 
