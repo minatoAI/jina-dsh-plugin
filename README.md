@@ -1,3 +1,5 @@
+[English](README.en.md) | **简体中文**
+
 # dsh-jina
 
 DeepSeek Harness 的 [Jina AI](https://jina.ai/) 插件（bundle）：把 jina-cli 的全部 API 能力以模型工具的形式装进 dsh，并在 Web 设置的**插件 → 配置**页（与 终端 / Agent 循环 / 网页搜索 相同的标准插件配置位置）提供 **Jina Tools** 卡片来配置 API key。
@@ -95,7 +97,8 @@ jina-dsh-plugin/
 │   ├── package.json   # dsh.client 声明（platform: web）
 │   ├── index.js       # 空主机半身（保证 loader 行可用）
 │   └── client.js      # 预构建浏览器 bundle：设置 → 插件 → 配置 的 "Jina Tools" 卡片
-└── README.md
+├── README.md          # 简体中文说明（本文件）
+└── README.en.md       # English README
 ```
 
 ## 开发说明
