@@ -2,11 +2,15 @@
 //
 // Executing this script only REGISTERS its factory with the module system
 // (`window.__ModuleLoader__.load`). The factory materializes on first import
-// and returns a cordis client plugin that registers the "Jina Tools" section
-// in the web settings panel. The section manages the `JINA_API_KEY`
-// credential through the standard credentials RPC domain: values cross the
-// wire only on save (credentials.set), and the page shows configured state,
-// never the stored value.
+// and returns a cordis client plugin that contributes a "Jina Tools" card to
+// the standard plugin configuration surface (Settings → Plugins → Configurable,
+// the `settings.plugin.item` list slot declared by the web settings package —
+// the same surface that hosts the Terminal / Agent loop / Web search cards).
+//
+// The card manages the `JINA_API_KEY` credential through the standard
+// credentials RPC domain: values cross the wire only on save
+// (credentials.set), and the page shows configured state, never the stored
+// value.
 window.__ModuleLoader__.load({
   id: 'dsh-jina/ui',
   factory: function (require) {
@@ -15,25 +19,42 @@ window.__ModuleLoader__.load({
     var CRED = 'JINA_API_KEY'
 
     var S = {
-      wrap: { display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 560 },
-      card: { boxSizing: 'border-box', background: 'var(--dsw-alias-bg-layer-2)', borderRadius: 16, padding: '16px 18px', boxShadow: 'var(--dsw-shadow-lv3)', display: 'flex', flexDirection: 'column', gap: 10 },
-      title: { fontSize: 15, fontWeight: 500, color: 'var(--dsw-alias-label-primary)', margin: 0, lineHeight: '22px' },
-      text: { fontSize: 13, lineHeight: '20px', color: 'var(--dsw-alias-label-secondary, rgba(127,127,127,0.92))', margin: 0 },
+      card: { boxSizing: 'border-box', background: 'var(--dsw-alias-bg-layer-2)', borderRadius: 16, boxShadow: 'var(--dsw-shadow-lv3)', overflow: 'hidden', margin: 0, listStyle: 'none' },
+      header: { boxSizing: 'border-box', width: '100%', display: 'flex', alignItems: 'center', gap: 12, border: 'none', background: 'transparent', cursor: 'pointer', padding: '14px 18px', fontFamily: 'inherit', textAlign: 'left', color: 'inherit' },
+      headText: { display: 'flex', flexDirection: 'column', gap: 2, flex: 1, minWidth: 0 },
+      name: { fontSize: 15, fontWeight: 500, color: 'var(--dsw-alias-label-primary)', lineHeight: '22px', margin: 0 },
+      description: { fontSize: 12, lineHeight: '18px', color: 'var(--dsw-alias-label-secondary, rgba(127,127,127,0.92))', margin: 0 },
+      chevron: { flex: 'none', color: 'var(--dsw-alias-label-secondary, rgba(127,127,127,0.92))', transition: 'transform .15s ease', display: 'block' },
+      body: { boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 12, padding: '0 18px 16px' },
       row: { display: 'flex', gap: 8, alignItems: 'center' },
       input: { boxSizing: 'border-box', flex: 1, minWidth: 0, height: 36, borderRadius: 10, border: '1px solid rgba(127,127,127,0.35)', background: 'var(--dsw-alias-bg-layer-1, transparent)', color: 'var(--dsw-alias-label-primary)', padding: '0 12px', fontSize: 13, fontFamily: 'inherit', outline: 'none' },
       button: { boxSizing: 'border-box', height: 36, borderRadius: 10, border: 'none', padding: '0 18px', cursor: 'pointer', fontSize: 13, fontWeight: 500, background: 'var(--dsw-alias-interactive-bg-hover)', color: 'var(--dsw-alias-label-primary)', fontFamily: 'inherit' },
       ghostButton: { boxSizing: 'border-box', height: 36, borderRadius: 10, border: '1px solid rgba(127,127,127,0.35)', padding: '0 18px', cursor: 'pointer', fontSize: 13, fontWeight: 500, background: 'transparent', color: 'var(--dsw-alias-label-secondary, rgba(127,127,127,0.92))', fontFamily: 'inherit' },
       status: { fontSize: 12, lineHeight: '18px', color: 'var(--dsw-alias-label-secondary, rgba(127,127,127,0.92))', margin: 0 },
       statusOk: { fontSize: 12, lineHeight: '18px', color: 'var(--dsw-alias-status-success, #2f9e44)', margin: 0 },
+      statusBad: { fontSize: 12, lineHeight: '18px', color: 'var(--dsw-alias-status-danger, #e03131)', margin: 0 },
+      note: { fontSize: 12, lineHeight: '18px', color: 'var(--dsw-alias-label-tertiary, rgba(127,127,127,0.6))', margin: 0 },
       link: { color: 'var(--dsw-alias-label-link, var(--dsw-alias-label-primary))', textDecoration: 'underline', cursor: 'pointer' },
     }
 
-    function JinaSettings(props) {
+    function Chevron(props) {
+      return React.createElement('svg', {
+        width: 14, height: 14, viewBox: '0 0 14 14', 'aria-hidden': true,
+        style: Object.assign({}, S.chevron, props.open ? { transform: 'rotate(180deg)' } : null),
+      },
+        React.createElement('path', {
+          d: 'M3.5 5.5L7 9l3.5-3.5', fill: 'none', stroke: 'currentColor',
+          strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round',
+        }))
+    }
+
+    function JinaCard(props) {
       var api = props.api
       var remote = props.remote
+      var [open, setOpen] = React.useState(false)
       var [input, setInput] = React.useState('')
       var [status, setStatus] = React.useState('')
-      var [ok, setOk] = React.useState(false)
+      var [statusKind, setStatusKind] = React.useState('info') // 'info' | 'ok' | 'bad'
       var [view, setView] = React.useState(undefined) // {configured, writable} | undefined while loading
 
       var refresh = function () {
@@ -55,42 +76,42 @@ window.__ModuleLoader__.load({
 
       function onSave() {
         if (input.trim() === '') {
-          setOk(false)
+          setStatusKind('bad')
           setStatus('请输入 API key。')
           return
         }
-        setOk(false)
+        setStatusKind('info')
         setStatus('保存中…')
         api.credentials.set({ ref: CRED, value: input.trim() }).then(function (response) {
           if (response.result.ok) {
-            setOk(true)
+            setStatusKind('ok')
             setStatus('已保存。')
             setInput('')
             refresh()
           } else {
-            setOk(false)
+            setStatusKind('bad')
             setStatus('保存失败：' + String((response.result.error && response.result.error.message) || '未知错误'))
           }
         }, function () {
-          setOk(false)
+          setStatusKind('bad')
           setStatus('保存失败，请重试。')
         })
       }
 
       function onClear() {
-        setOk(false)
+        setStatusKind('info')
         setStatus('清除中…')
         api.credentials.unset({ ref: CRED }).then(function (response) {
           if (response.result.ok) {
-            setOk(true)
+            setStatusKind('ok')
             setStatus('已清除。')
             refresh()
           } else {
-            setOk(false)
+            setStatusKind('bad')
             setStatus('清除失败：' + String((response.result.error && response.result.error.message) || '未知错误'))
           }
         }, function () {
-          setOk(false)
+          setStatusKind('bad')
           setStatus('清除失败，请重试。')
         })
       }
@@ -102,41 +123,46 @@ window.__ModuleLoader__.load({
         : configured
           ? 'API key 已保存（来源：' + String(view.source || '本机存储') + '）。粘贴新 key 并保存即可覆盖。'
           : '尚未保存 API key。'
+      var statusStyle = statusKind === 'ok' ? S.statusOk : (statusKind === 'bad' ? S.statusBad : S.status)
 
-      return React.createElement('div', { style: S.wrap },
-        React.createElement('div', { style: S.card },
-          React.createElement('p', { style: S.title }, 'Jina AI API Key'),
-          React.createElement('p', { style: S.text }, 'jina_search / jina_read 等工具会优先使用这里保存的 key。免费 key 可在 ', React.createElement('a', { style: S.link, href: 'https://jina.ai/?sui=apikey', target: '_blank', rel: 'noreferrer' }, 'jina.ai'), ' 获取。'),
-          React.createElement('div', { style: S.row },
-            React.createElement('input', {
-              style: S.input,
-              type: 'password',
-              value: input,
-              placeholder: '粘贴 API key…',
-              onChange: onInput,
-              autoComplete: 'off',
-              spellCheck: false,
-              disabled: view !== undefined && !writable,
-            }),
-            React.createElement('button', {
-              style: S.button,
-              onClick: onSave,
-              disabled: view !== undefined && !writable,
-            }, '保存'),
-            configured
-              ? React.createElement('button', { style: S.ghostButton, onClick: onClear, disabled: !writable }, '清除')
-              : null,
-          ),
-          status !== '' ? React.createElement('p', { style: ok ? S.statusOk : S.status }, status) : null,
-          React.createElement('p', { style: S.status }, shown),
-          view !== undefined && !writable ? React.createElement('p', { style: S.status }, '当前环境只读：key 由环境变量等来源提供，无法在此修改。') : null,
-        ),
-        React.createElement('div', { style: S.card },
-          React.createElement('p', { style: S.title }, 'key 的解析顺序'),
-          React.createElement('p', { style: S.text }, '1. 工具调用参数 apiKey；2. 本页保存的 key（credential 引用 ' + CRED + '，由 dsh 凭据存储持久化）；3. 会话工作区的 jina-api-key.txt；4. dsh 主目录下的 jina-api-key.txt。'),
-          React.createElement('p', { style: S.text }, '保存后立即生效，无需重启。中国大陆网络环境下调用 Jina 需要 VPN；插件会自动发现并跟随系统代理（含代理端口变化）。'),
-        ),
-      )
+      return React.createElement('li', { style: S.card },
+        React.createElement('button', {
+          type: 'button',
+          style: S.header,
+          'aria-expanded': open,
+          onClick: function () { setOpen(!open) },
+        },
+          React.createElement('span', { style: S.headText },
+            React.createElement('span', { style: S.name }, 'Jina Tools'),
+            React.createElement('span', { style: S.description }, 'Jina AI 搜索/阅读/嵌入等工具的 API key。')),
+          React.createElement(Chevron, { open: open })),
+        open
+          ? React.createElement('div', { style: S.body },
+            React.createElement('p', { style: S.note }, 'jina_search / jina_read 等工具会优先使用这里保存的 key。免费 key 可在 ', React.createElement('a', { style: S.link, href: 'https://jina.ai/?sui=apikey', target: '_blank', rel: 'noreferrer' }, 'jina.ai'), ' 获取。'),
+            React.createElement('div', { style: S.row },
+              React.createElement('input', {
+                style: S.input,
+                type: 'password',
+                value: input,
+                placeholder: '粘贴 API key…',
+                onChange: onInput,
+                autoComplete: 'off',
+                spellCheck: false,
+                disabled: view !== undefined && !writable,
+              }),
+              React.createElement('button', {
+                style: S.button,
+                onClick: onSave,
+                disabled: view !== undefined && !writable,
+              }, '保存'),
+              configured
+                ? React.createElement('button', { style: S.ghostButton, onClick: onClear, disabled: !writable }, '清除')
+                : null),
+            status !== '' ? React.createElement('p', { style: statusStyle }, status) : null,
+            React.createElement('p', { style: S.note }, shown),
+            view !== undefined && !writable ? React.createElement('p', { style: S.note }, '当前环境只读：key 由环境变量等来源提供，无法在此修改。') : null,
+            React.createElement('p', { style: S.note }, 'key 解析顺序：1. 工具参数 apiKey；2. 本页保存的 key（credential 引用 ' + CRED + '，由 dsh 凭据存储持久化）；3. 会话工作区的 jina-api-key.txt；4. dsh 主目录下的 jina-api-key.txt。保存后立即生效。中国大陆网络环境下调用 Jina 需要 VPN；插件会自动发现并跟随系统代理（含代理端口变化）。'))
+          : null)
     }
 
     exports.name = 'dsh-jina-ui'
@@ -149,11 +175,14 @@ window.__ModuleLoader__.load({
       var api = connection ? connection.api : undefined
       var remote = ctx.get('remote')
       if (api === undefined || remote === undefined) return
-      slots.inject('settings.section', function () {
+      // Standard plugin-configuration card slot (Settings → Plugins →
+      // Configurable). `slots.inject` waits for the declarer package and
+      // unregisters automatically if the surface disappears.
+      ctx.slots.inject('settings.plugin.item', function () {
         return slots.register(
-          { name: 'settings.section', id: 'jina-tools', order: 30, label: 'Jina Tools' },
-          function (props) {
-            return React.createElement(JinaSettings, { api: api, remote: remote, close: props.close })
+          { name: 'settings.plugin.item', id: 'jina-tools', order: 30 },
+          function (slotProps) {
+            return React.createElement(JinaCard, { api: api, remote: remote })
           },
         )
       })

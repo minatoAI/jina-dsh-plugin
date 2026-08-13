@@ -460,6 +460,11 @@ export function apply(ctx) {
   }
 
   // ---- tool registration ---------------------------------------------------
+  // IMPORTANT: `tools.register` forwards `parameters` verbatim to the model API.
+  // It must therefore be a full JSON Schema object ({ type: 'object',
+  // properties, required, additionalProperties }) — NOT the defineTool-style
+  // per-property map ({ field: { type, required: true } }), which the model
+  // server rejects ("schema must be a JSON Schema of 'type: \"object\"'").
   const OUT = {
     schema: { type: 'string' },
     render(_args, value) { return [{ type: 'text', text: value }] },
@@ -469,15 +474,20 @@ export function apply(ctx) {
     name: 'jina_search',
     description: 'Search the web via Jina AI (https://jina.ai), mirroring the jina-cli \'search\' command. Supports web (default), arxiv, ssrn, images and blog domains, a time filter, country/language hints, and result count. Requires a Jina API key (set in the DSH settings page "Jina Tools", a key file, or the apiKey parameter).',
     parameters: {
-      query: { type: 'string', required: true, description: 'Search query.' },
-      type: { type: 'string', enum: ['web', 'arxiv', 'ssrn', 'images', 'blog'], description: 'Search domain. Default: web.' },
-      num: { type: 'number', description: 'Number of results. Default: 5.' },
-      time: { type: 'string', enum: ['h', 'd', 'w', 'm', 'y'], description: 'Only results from the last hour/day/week/month/year.' },
-      location: { type: 'string', description: 'Location hint for search results.' },
-      gl: { type: 'string', description: 'Country code, e.g. us, de, jp.' },
-      hl: { type: 'string', description: 'Language code, e.g. en, zh-cn.' },
-      json: { type: 'boolean', description: 'Return the raw JSON response instead of formatted results.' },
-      apiKey: { type: 'string', description: 'Optional Jina API key override.' },
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        query: { type: 'string', description: 'Search query.' },
+        type: { type: 'string', enum: ['web', 'arxiv', 'ssrn', 'images', 'blog'], description: 'Search domain. Default: web.' },
+        num: { type: 'number', description: 'Number of results. Default: 5.' },
+        time: { type: 'string', enum: ['h', 'd', 'w', 'm', 'y'], description: 'Only results from the last hour/day/week/month/year.' },
+        location: { type: 'string', description: 'Location hint for search results.' },
+        gl: { type: 'string', description: 'Country code, e.g. us, de, jp.' },
+        hl: { type: 'string', description: 'Language code, e.g. en, zh-cn.' },
+        json: { type: 'boolean', description: 'Return the raw JSON response instead of formatted results.' },
+        apiKey: { type: 'string', description: 'Optional Jina API key override.' },
+      },
+      required: ['query'],
     },
     output: OUT,
     async execute(args, exec) {
@@ -506,11 +516,16 @@ export function apply(ctx) {
     name: 'jina_read',
     description: 'Read a web page and extract clean markdown via Jina Reader (r.jina.ai), mirroring the jina-cli \'read\' command. Works without an API key (rate-limited); pass a key for higher limits. Use links/images to include link/image summaries.',
     parameters: {
-      url: { type: 'string', required: true, description: 'Page URL, starting with http:// or https://.' },
-      links: { type: 'boolean', description: 'Include hyperlinks in the output.' },
-      images: { type: 'boolean', description: 'Include image summaries in the output.' },
-      json: { type: 'boolean', description: 'Return the raw JSON response instead of markdown.' },
-      apiKey: { type: 'string', description: 'Optional Jina API key override.' },
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        url: { type: 'string', description: 'Page URL, starting with http:// or https://.' },
+        links: { type: 'boolean', description: 'Include hyperlinks in the output.' },
+        images: { type: 'boolean', description: 'Include image summaries in the output.' },
+        json: { type: 'boolean', description: 'Return the raw JSON response instead of markdown.' },
+        apiKey: { type: 'string', description: 'Optional Jina API key override.' },
+      },
+      required: ['url'],
     },
     output: OUT,
     async execute(args, exec) {
@@ -537,9 +552,14 @@ export function apply(ctx) {
     name: 'jina_screenshot',
     description: 'Capture a screenshot of a web page via Jina (r.jina.ai), mirroring the jina-cli \'screenshot\' command. Returns the hosted screenshot URL. Requires a Jina API key.',
     parameters: {
-      url: { type: 'string', required: true, description: 'Page URL, starting with http:// or https://.' },
-      fullPage: { type: 'boolean', description: 'Capture the full page instead of the viewport.' },
-      apiKey: { type: 'string', description: 'Optional Jina API key override.' },
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        url: { type: 'string', description: 'Page URL, starting with http:// or https://.' },
+        fullPage: { type: 'boolean', description: 'Capture the full page instead of the viewport.' },
+        apiKey: { type: 'string', description: 'Optional Jina API key override.' },
+      },
+      required: ['url'],
     },
     output: OUT,
     async execute(args, exec) {
@@ -559,7 +579,12 @@ export function apply(ctx) {
     name: 'jina_datetime',
     description: 'Guess the publish/update datetime of a URL via Jina (r.jina.ai), mirroring the jina-cli \'datetime\' command. Works without an API key.',
     parameters: {
-      url: { type: 'string', required: true, description: 'Page URL, starting with http:// or https://.' },
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        url: { type: 'string', description: 'Page URL, starting with http:// or https://.' },
+      },
+      required: ['url'],
     },
     output: OUT,
     async execute(args, exec) {
@@ -579,9 +604,14 @@ export function apply(ctx) {
     name: 'jina_expand',
     description: 'Expand a search query into related queries via Jina, mirroring the jina-cli \'expand\' command. Requires a Jina API key.',
     parameters: {
-      query: { type: 'string', required: true, description: 'The query to expand.' },
-      json: { type: 'boolean', description: 'Return the raw JSON response instead of formatted queries.' },
-      apiKey: { type: 'string', description: 'Optional Jina API key override.' },
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        query: { type: 'string', description: 'The query to expand.' },
+        json: { type: 'boolean', description: 'Return the raw JSON response instead of formatted queries.' },
+        apiKey: { type: 'string', description: 'Optional Jina API key override.' },
+      },
+      required: ['query'],
     },
     output: OUT,
     async execute(args, exec) {
@@ -600,12 +630,17 @@ export function apply(ctx) {
     name: 'jina_embed',
     description: 'Generate embeddings for texts via Jina Embeddings API, mirroring the jina-cli \'embed\' command. Requires a Jina API key. Default model: jina-embeddings-v5-text-small.',
     parameters: {
-      texts: { type: 'array', items: { type: 'string' }, required: true, description: 'Texts to embed (up to a few hundred).' },
-      model: { type: 'string', description: 'Embedding model. Default: jina-embeddings-v5-text-small.' },
-      task: { type: 'string', description: 'Embedding task type. Default: text-matching.' },
-      dimensions: { type: 'number', description: 'Optional output dimensions (Matryoshka).' },
-      json: { type: 'boolean', description: 'Return the raw JSON response (full vectors) instead of a preview.' },
-      apiKey: { type: 'string', description: 'Optional Jina API key override.' },
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        texts: { type: 'array', items: { type: 'string' }, description: 'Texts to embed (up to a few hundred).' },
+        model: { type: 'string', description: 'Embedding model. Default: jina-embeddings-v5-text-small.' },
+        task: { type: 'string', description: 'Embedding task type. Default: text-matching.' },
+        dimensions: { type: 'number', description: 'Optional output dimensions (Matryoshka).' },
+        json: { type: 'boolean', description: 'Return the raw JSON response (full vectors) instead of a preview.' },
+        apiKey: { type: 'string', description: 'Optional Jina API key override.' },
+      },
+      required: ['texts'],
     },
     output: OUT,
     async execute(args, exec) {
@@ -626,12 +661,17 @@ export function apply(ctx) {
     name: 'jina_rerank',
     description: 'Rerank documents by relevance to a query via Jina Reranker API, mirroring the jina-cli \'rerank\' command. Requires a Jina API key. Default model: jina-reranker-v3.5.',
     parameters: {
-      query: { type: 'string', required: true, description: 'The reference query.' },
-      documents: { type: 'array', items: { type: 'string' }, required: true, description: 'Documents (strings) to rerank.' },
-      topN: { type: 'number', description: 'Maximum number of results to return.' },
-      model: { type: 'string', description: 'Reranker model. Default: jina-reranker-v3.5.' },
-      json: { type: 'boolean', description: 'Return the raw JSON response instead of formatted results.' },
-      apiKey: { type: 'string', description: 'Optional Jina API key override.' },
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        query: { type: 'string', description: 'The reference query.' },
+        documents: { type: 'array', items: { type: 'string' }, description: 'Documents (strings) to rerank.' },
+        topN: { type: 'number', description: 'Maximum number of results to return.' },
+        model: { type: 'string', description: 'Reranker model. Default: jina-reranker-v3.5.' },
+        json: { type: 'boolean', description: 'Return the raw JSON response instead of formatted results.' },
+        apiKey: { type: 'string', description: 'Optional Jina API key override.' },
+      },
+      required: ['query', 'documents'],
     },
     output: OUT,
     async execute(args, exec) {
@@ -652,11 +692,16 @@ export function apply(ctx) {
     name: 'jina_classify',
     description: 'Classify texts into labels via Jina Classify API, mirroring the jina-cli \'classify\' command. Requires a Jina API key. Default model: jina-embeddings-v5-text-small.',
     parameters: {
-      texts: { type: 'array', items: { type: 'string' }, required: true, description: 'Texts to classify.' },
-      labels: { type: 'array', items: { type: 'string' }, required: true, description: 'Candidate labels.' },
-      model: { type: 'string', description: 'Embedding model used for classification. Default: jina-embeddings-v5-text-small.' },
-      json: { type: 'boolean', description: 'Return the raw JSON response instead of formatted predictions.' },
-      apiKey: { type: 'string', description: 'Optional Jina API key override.' },
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        texts: { type: 'array', items: { type: 'string' }, description: 'Texts to classify.' },
+        labels: { type: 'array', items: { type: 'string' }, description: 'Candidate labels.' },
+        model: { type: 'string', description: 'Embedding model used for classification. Default: jina-embeddings-v5-text-small.' },
+        json: { type: 'boolean', description: 'Return the raw JSON response instead of formatted predictions.' },
+        apiKey: { type: 'string', description: 'Optional Jina API key override.' },
+      },
+      required: ['texts', 'labels'],
     },
     output: OUT,
     async execute(args, exec) {
@@ -676,12 +721,16 @@ export function apply(ctx) {
     name: 'jina_pdf',
     description: 'Extract figures, tables and equations from a PDF via Jina (extract-pdf), mirroring the jina-cli \'pdf\' command. Provide either url or arxivId. Requires a Jina API key.',
     parameters: {
-      url: { type: 'string', description: 'PDF URL (https).' },
-      arxivId: { type: 'string', description: 'arXiv paper ID shorthand, e.g. 2301.12345.' },
-      extractType: { type: 'string', description: 'Filter by type: figure, table, equation (comma-separated).' },
-      maxEdge: { type: 'number', description: 'Max pixel size for extracted images. Default: 1024.' },
-      json: { type: 'boolean', description: 'Return the raw JSON response instead of formatted output.' },
-      apiKey: { type: 'string', description: 'Optional Jina API key override.' },
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        url: { type: 'string', description: 'PDF URL (https).' },
+        arxivId: { type: 'string', description: 'arXiv paper ID shorthand, e.g. 2301.12345.' },
+        extractType: { type: 'string', description: 'Filter by type: figure, table, equation (comma-separated).' },
+        maxEdge: { type: 'number', description: 'Max pixel size for extracted images. Default: 1024.' },
+        json: { type: 'boolean', description: 'Return the raw JSON response instead of formatted output.' },
+        apiKey: { type: 'string', description: 'Optional Jina API key override.' },
+      },
     },
     output: OUT,
     async execute(args, exec) {
@@ -704,7 +753,7 @@ export function apply(ctx) {
   ctx.tools.register({
     name: 'jina_primer',
     description: 'Get context info (current time, location, network facts) via Jina (r.jina.ai), mirroring the jina-cli \'primer\' command. Works without an API key.',
-    parameters: {},
+    parameters: { type: 'object', additionalProperties: false, properties: {} },
     output: OUT,
     async execute(_args, exec) {
       const signal = enterExec(exec)

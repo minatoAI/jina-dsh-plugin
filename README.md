@@ -1,6 +1,6 @@
 # dsh-jina
 
-DeepSeek Harness 的 [Jina AI](https://jina.ai/) 插件（bundle）：把 jina-cli 的全部 API 能力以模型工具的形式装进 dsh，并在 Web 设置面板提供 **Jina Tools** 页面来配置 API key。
+DeepSeek Harness 的 [Jina AI](https://jina.ai/) 插件（bundle）：把 jina-cli 的全部 API 能力以模型工具的形式装进 dsh，并在 Web 设置的**插件 → 配置**页（与 终端 / Agent 循环 / 网页搜索 相同的标准插件配置位置）提供 **Jina Tools** 卡片来配置 API key。
 
 ## 功能
 
@@ -37,7 +37,7 @@ dsh plugin --profile web add ./jina-dsh-plugin
 dsh --profile web
 ```
 
-然后打开 Web 界面 → 左下角 设置 → **Jina Tools** → 粘贴 API key → 保存。免费 key 在 https://jina.ai/?sui=apikey 获取。
+然后打开 Web 界面 → 设置 → **插件** → **配置** 选项卡 → 展开 **Jina Tools** 卡片 → 粘贴 API key → 保存。免费 key 在 https://jina.ai/?sui=apikey 获取。
 
 ## API key 解析顺序
 
@@ -66,16 +66,16 @@ dsh plugin --profile web remove dsh-jina
 jina-dsh-plugin/
 ├── package.json       # manifest: "dsh": { "bundle": { "patch": "./cordis.patch.yml" } }
 ├── cordis.patch.yml   # 组合层：插入 dsh-jina（主机工具行）与 dsh-jina/ui（客户端 UI 行）
-├── index.js           # 主机插件：10 个工具 + 网络传输 + settings 命名空间
+├── index.js           # 主机插件：10 个工具 + 网络传输 + JINA_API_KEY 凭据解析
 ├── ui/
 │   ├── package.json   # dsh.client 声明（platform: web）
 │   ├── index.js       # 空主机半身（保证 loader 行可用）
-│   └── client.js      # 预构建浏览器 bundle：设置面板 "Jina Tools" 页
+│   └── client.js      # 预构建浏览器 bundle：设置 → 插件 → 配置 的 "Jina Tools" 卡片
 └── README.md
 ```
 
 ## 开发说明
 
 - 主机插件只依赖 Node 内置模块与 dsh 主机服务（`fs`、`subprocess`、`tools`、`credentials`），无第三方 npm 依赖；凭据走 dsh 原生的 credential seam（引用 `JINA_API_KEY`），任何 profile 组合都可以直接使用。
-- 客户端 bundle 直接提交（`ui/client.js`），无构建步骤，git 安装开箱即用。改 UI 后直接改该文件并重启即可。设置页通过标准的 `credentials.describe/set/unset` RPC 管理 key（这是唯一对第三方插件开放的配置通道——settings 命名空间对浏览器有白名单限制）。
+- 客户端 bundle 直接提交（`ui/client.js`），无构建步骤，git 安装开箱即用。改 UI 后直接改该文件并重启即可。卡片注册进 Web 设置包声明的 `settings.plugin.item` 插槽（设置 → 插件 → 配置），这是第三方插件配置的标准位置；key 通过标准的 `credentials.describe/set/unset` RPC 管理（这是唯一对第三方插件开放的配置通道——settings 命名空间对浏览器有白名单限制）。
 - 组合层遵循 dsh 约定：主机行 `dsh-jina` 注册模型工具；客户端行 `dsh-jina/ui` 由 host 的 client-modules 服务通过 `ui/package.json` 的 `dsh.client` 声明发现并接入 Web boot graph。
