@@ -4,11 +4,13 @@ DeepSeek Harness 的 [Jina AI](https://jina.ai/) 插件（bundle）：把 jina-c
 
 ## 功能
 
-安装后所有会话（所有 agent preset）都会获得 10 个 `jina_*` 工具：
+安装后所有会话（所有 agent preset）都会获得 12 个 `jina_*` 工具：
 
 | 工具 | 对应 jina-cli 命令 | 说明 |
 | --- | --- | --- |
-| `jina_search` | `jina search` | 网页搜索（web / arxiv / ssrn / images / blog），支持时间过滤与地区/语言提示 |
+| `jina_search` | `jina search` | 通用网页搜索（默认 web 域；images / blog 域，支持时间过滤与地区/语言提示） |
+| `jina_search_arxiv` | `jina search --arxiv` | arXiv 预印本检索（CS / ML / 数学 / 物理等，返回 arxiv.org 官方论文直链） |
+| `jina_search_ssrn` | `jina search --ssrn` | SSRN 论文检索（经济 / 金融 / 法律 / 管理等社会科学，返回 papers.ssrn.com 直链） |
 | `jina_read` | `jina read` | 把网页读成干净的 markdown |
 | `jina_screenshot` | `jina screenshot` | 网页截图，返回托管图片 URL（支持整页截图） |
 | `jina_datetime` | `jina datetime` | 推测网页的发布/更新时间 |
@@ -18,6 +20,21 @@ DeepSeek Harness 的 [Jina AI](https://jina.ai/) 插件（bundle）：把 jina-c
 | `jina_classify` | `jina classify` | 文本分类 |
 | `jina_pdf` | `jina pdf` | 从 PDF 提取图表/公式（支持 arXiv ID） |
 | `jina_primer` | `jina primer` | 获取当前时间/位置/网络上下文信息 |
+
+## 效果实测（与内置 web_search 交叉对比）
+
+为了让模型**不用记住参数**就能用对检索域，学术检索单独拆成了 `jina_search_arxiv` / `jina_search_ssrn` 两个专用工具（对应 `jina search --arxiv` / `--ssrn`）——工具名即用途，模型看到用户要论文会直接调用它们。以下为 2026-08-13 在同机真实网络环境（VPN 系统代理）下的抽样对比：同一查询分别调用本插件与 dsh 内置 `web_search`，人工核对结果。
+
+| 场景 | 本插件（dsh-jina） | 内置 web_search | 结论 |
+| --- | --- | --- | --- |
+| 学术检索（arXiv） | `jina_search_arxiv`「retrieval augmented generation survey」→ **9/9 全部为 arxiv.org 官方直链**：2312.10997（RAG 经典综述）、2506.00054、2410.12837、2501.09136（Agentic RAG）、2405.07437、2504.08748 等，篇篇主题契合、摘要准确 | 同查询返回 arXiv **镜像站**（ezproxy.obspm.fr、ar5iv、sinoxiv.napstic.cn）与 BibTeX 链接，官方直链缺失 | ✅ jina 胜：官方直链 + 精准召回 |
+| 学术检索（SSRN） | `jina_search_ssrn`「large language models financial markets」→ **9/9 全部为 papers.ssrn.com 原文**：市场情绪预测、LLM 模拟交易、AI 羊群效应、投资者分歧等，契合度极高 | 无 SSRN 专用检索能力 | ✅ jina 胜：独占 SSRN 域 |
+| 中文新闻 / 社区 / 官方源 | `jina_search` 官方源（政府 / 公司官网）置顶，可加 `time` 过滤时效 | 同查询结果相关，但官方源不置顶 | ✅ jina 优：权威源优先 + 时效过滤 |
+| 泛学术检索（未指定域） | 默认 web 域对 Springer / IEEE / ACL 等覆盖面一般（学术检索请改用上面的专用工具） | Springer / IEEE / ACL 覆盖面广 | ✅ web_search 优：泛学术检索用它 |
+
+**结论与分工用法**：学术论文 → `jina_search_arxiv` / `jina_search_ssrn`；中文时效新闻 → `jina_search`（+ `time`）；泛学术 / 工程文档 → 内置 `web_search`。两者互补，覆盖全部检索场景。
+
+> 注：上表为单轮抽样对比（非严格 benchmark），结果受当天网络与查询选择影响；两个工具链均真实可用，结论供选型参考。
 
 ## 安装
 
@@ -68,7 +85,7 @@ dsh plugin --profile web remove dsh-jina
 jina-dsh-plugin/
 ├── package.json       # manifest: "dsh": { "bundle": { "patch": "./cordis.patch.yml" } }
 ├── cordis.patch.yml   # 组合层：插入 dsh-jina（主机工具行）与 dsh-jina/ui（客户端 UI 行）
-├── index.js           # 主机插件：10 个工具 + 网络传输 + JINA_API_KEY 凭据解析
+├── index.js           # 主机插件：12 个工具（含 jina_search_arxiv / jina_search_ssrn 专用学术检索）+ 网络传输 + JINA_API_KEY 凭据解析
 ├── ui/
 │   ├── package.json   # dsh.client 声明（platform: web）
 │   ├── index.js       # 空主机半身（保证 loader 行可用）

@@ -1,9 +1,11 @@
 /**
  * dsh-jina — Jina AI tools for DeepSeek Harness.
  *
- * Host plugin: registers the ten jina_* model tools mirroring jina-cli
- * (search / read / screenshot / datetime / expand / embed / rerank /
- * classify / pdf / primer). The API key lives in the host credential seam
+ * Host plugin: registers the twelve jina_* model tools mirroring jina-cli
+ * (search — with dedicated jina_search_arxiv / jina_search_ssrn academic
+ * shortcuts so the model can hit the right domain without remembering the
+ * `type` parameter — / read / screenshot / datetime / expand / embed /
+ * rerank / classify / pdf / primer). The API key lives in the host credential seam
  * under the reference `JINA_API_KEY` — the "Jina Tools" web settings page
  * writes it through `credentials.set`, and this plugin resolves it per
  * operation (the seam's contract: never cache across operations).
@@ -498,15 +500,38 @@ export function apply(ctx) {
     render(_args, value) { return [{ type: 'text', text: value }] },
   }
 
+  /** Shared executor for the jina_search* family (web / arxiv / ssrn). */
+  async function runSearch(args, exec, fixedType) {
+    const signal = enterExec(exec)
+    const body = { q: String(args.query) }
+    const t = fixedType || args.type
+    if (t === 'arxiv') body.domain = 'arxiv'
+    else if (t === 'ssrn') body.domain = 'ssrn'
+    else if (t === 'images') body.type = 'images'
+    else if (t === 'blog') body.q = 'site:jina.ai/news ' + String(args.query)
+    if (args.num !== undefined) body.num = args.num
+    if (args.time) body.tbs = 'qdr:' + args.time
+    if (args.location) body.location = args.location
+    if (args.gl) body.gl = args.gl
+    if (args.hl) body.hl = args.hl
+    const res = await callJina({
+      url: SEARCH, method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body, timeoutMs: 60000, needsKey: true, apiKey: args.apiKey, signal,
+    })
+    if (!res.ok) return describeJinaError(res)
+    return fmtSearch(res.text, args.json === true)
+  }
+
   ctx.tools.register({
     name: 'jina_search',
-    description: 'Search the web via Jina AI (https://jina.ai), mirroring the jina-cli \'search\' command. Supports web (default), arxiv, ssrn, images and blog domains, a time filter, country/language hints, and result count. Requires a Jina API key (set in the DSH settings page "Jina Tools", a key file, or the apiKey parameter).',
+    description: 'General web search via Jina AI, mirroring the jina-cli \'search\' command (default domain: web). For academic papers, prefer the dedicated tools: jina_search_arxiv (arXiv preprints — computer science, machine learning, math, physics) and jina_search_ssrn (SSRN — economics, finance, law, management); they return canonical paper links and do not need the type parameter. The type parameter additionally covers the images and blog domains. Supports a time filter, country/language hints and result count. Requires a Jina API key (set in the DSH settings page "Jina Tools", a key file, or the apiKey parameter).',
     parameters: {
       type: 'object',
       additionalProperties: false,
       properties: {
         query: { type: 'string', description: 'Search query.' },
-        type: { type: 'string', enum: ['web', 'arxiv', 'ssrn', 'images', 'blog'], description: 'Search domain. Default: web.' },
+        type: { type: 'string', enum: ['web', 'arxiv', 'ssrn', 'images', 'blog'], description: 'Search domain. Default: web. For academic papers prefer the jina_search_arxiv / jina_search_ssrn tools.' },
         num: { type: 'number', description: 'Number of results. Default: 5.' },
         time: { type: 'string', enum: ['h', 'd', 'w', 'm', 'y'], description: 'Only results from the last hour/day/week/month/year.' },
         location: { type: 'string', description: 'Location hint for search results.' },
@@ -519,24 +544,47 @@ export function apply(ctx) {
     },
     output: OUT,
     async execute(args, exec) {
-      const signal = enterExec(exec)
-      const body = { q: String(args.query) }
-      if (args.type === 'arxiv') body.domain = 'arxiv'
-      else if (args.type === 'ssrn') body.domain = 'ssrn'
-      else if (args.type === 'images') body.type = 'images'
-      else if (args.type === 'blog') body.q = 'site:jina.ai/news ' + String(args.query)
-      if (args.num !== undefined) body.num = args.num
-      if (args.time) body.tbs = 'qdr:' + args.time
-      if (args.location) body.location = args.location
-      if (args.gl) body.gl = args.gl
-      if (args.hl) body.hl = args.hl
-      const res = await callJina({
-        url: SEARCH, method: 'POST',
-        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-        body, timeoutMs: 60000, needsKey: true, apiKey: args.apiKey, signal,
-      })
-      if (!res.ok) return describeJinaError(res)
-      return fmtSearch(res.text, args.json === true)
+      return runSearch(args, exec)
+    },
+  })
+
+  ctx.tools.register({
+    name: 'jina_search_arxiv',
+    description: 'Search academic papers and preprints on arXiv via Jina. Use this whenever the user asks for computer science, machine learning, mathematics, physics or other quantitative research papers, surveys or preprints. Results are canonical arxiv.org paper links with accurate snippets. Requires a Jina API key (set in the DSH settings page "Jina Tools", a key file, or the apiKey parameter).',
+    parameters: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        query: { type: 'string', description: 'Search query: paper title, topic or keywords.' },
+        num: { type: 'number', description: 'Number of results. Default: 5.' },
+        json: { type: 'boolean', description: 'Return the raw JSON response instead of formatted results.' },
+        apiKey: { type: 'string', description: 'Optional Jina API key override.' },
+      },
+      required: ['query'],
+    },
+    output: OUT,
+    async execute(args, exec) {
+      return runSearch(args, exec, 'arxiv')
+    },
+  })
+
+  ctx.tools.register({
+    name: 'jina_search_ssrn',
+    description: 'Search academic papers on SSRN (Social Science Research Network) via Jina. Use this whenever the user asks for economics, finance, law, management or other social-science working papers and publications. Results are canonical papers.ssrn.com links with accurate snippets. Requires a Jina API key (set in the DSH settings page "Jina Tools", a key file, or the apiKey parameter).',
+    parameters: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        query: { type: 'string', description: 'Search query: paper title, topic or keywords.' },
+        num: { type: 'number', description: 'Number of results. Default: 5.' },
+        json: { type: 'boolean', description: 'Return the raw JSON response instead of formatted results.' },
+        apiKey: { type: 'string', description: 'Optional Jina API key override.' },
+      },
+      required: ['query'],
+    },
+    output: OUT,
+    async execute(args, exec) {
+      return runSearch(args, exec, 'ssrn')
     },
   })
 
