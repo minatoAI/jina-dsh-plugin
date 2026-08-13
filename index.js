@@ -3,12 +3,15 @@
  *
  * Host plugin: registers the ten jina_* model tools mirroring jina-cli
  * (search / read / screenshot / datetime / expand / embed / rerank /
- * classify / pdf / primer), plus the `jina-tools` settings namespace that
- * holds the API key and feeds the "Jina Tools" web settings page.
+ * classify / pdf / primer). The API key lives in the host credential seam
+ * under the reference `JINA_API_KEY` — the "Jina Tools" web settings page
+ * writes it through `credentials.set`, and this plugin resolves it per
+ * operation (the seam's contract: never cache across operations).
  *
  * The API key is resolved per call in this order:
  *   1. the tool's own `apiKey` parameter,
- *   2. the `jina-tools` settings namespace (set from the web settings page),
+ *   2. the `JINA_API_KEY` credential (set from the web settings page,
+ *      persisted by the host credential provider, e.g. `.credentials.yaml`),
  *   3. `jina-api-key.txt` in the calling session's workspace,
  *   4. `jina-api-key.txt` in the dsh home directory (`$DSH_HOME` or `~/.dsh`).
  *
@@ -21,8 +24,6 @@
  */
 
 import { homedir } from 'node:os'
-import { createRequire } from 'node:module'
-import { pathToFileURL } from 'node:url'
 
 export const name = 'dsh-jina'
 
@@ -33,7 +34,7 @@ export function apply(ctx) {
   const SEARCH = 'https://svip.jina.ai/'
   const API = 'https://api.jina.ai'
   const KEY_FILE = 'jina-api-key.txt'
-  const SETTINGS_NS = 'jina-tools'
+  const CRED_REF = 'JINA_API_KEY'
   const MAX_OUT = 1500000
 
   const HTTP_SCRIPT = [
@@ -67,11 +68,10 @@ export function apply(ctx) {
   ].join('\n')
 
   let nodePath
-  let keyCache = { text: undefined, at: 0 }
+  let fileKeyCache = { text: undefined, at: 0 }
   let keyDiag = ''
   let proxyCache = { text: undefined, at: 0, done: false }
   let currentCwd = undefined
-  let settingsScope = undefined
 
   /** dsh home directory: $DSH_HOME, else ~/.dsh. */
   function dshHome() {
@@ -145,52 +145,71 @@ export function apply(ctx) {
     })
   }
 
-  /** The settings namespace value is the live source of truth; the cache only smooths file reads. */
-  function settingsKey() {
+  /**
+   * Resolve the `JINA_API_KEY` credential. Per-operation by contract: the
+   * credential seam documents that consumers re-resolve at each operation so
+   * a changed credential reaches the next operation without a restart.
+   * @returns the credential value, or undefined while unconfigured/absent.
+   */
+  async function credentialKey() {
     try {
-      if (settingsScope === undefined) return ''
-      const value = settingsScope.get()
-      const key = value && typeof value.apiKey === 'string' ? value.apiKey.trim() : ''
-      return key
-    } catch (err) { return '' }
+      const svc = ctx.get('credentials')
+      if (svc === undefined) return undefined
+      const resolved = await svc.resolve(CRED_REF)
+      return resolved && resolved.value ? resolved.value : undefined
+    } catch (err) { return undefined }
   }
 
-  /** API key: settings namespace, then workspace file, then dsh-home file. */
+  /** API key: credential, then workspace file, then dsh-home file. */
   async function loadKey() {
-    if (keyCache.text !== undefined && Date.now() - keyCache.at < 30000) return keyCache.text
     let value
     const attempts = []
     try {
-      const fromSettings = settingsKey()
-      if (fromSettings !== '') { value = fromSettings; attempts.push('settings: found') }
-      else attempts.push('settings: not set')
-    } catch (err) {
-      attempts.push('settings: ' + String((err && err.message) || err))
-    }
-    if (value === undefined) {
-      const root = resolveRoot()
-      const home = dshHome()
-      const candidates = [
-        { kind: 'workspace abs', path: root + '\\' + KEY_FILE, opts: undefined },
-        { kind: 'workspace rel+cwd', path: KEY_FILE, opts: { cwd: root } },
-        { kind: 'workspace rel', path: KEY_FILE, opts: undefined },
-        { kind: 'home abs', path: home + '\\' + KEY_FILE, opts: undefined },
-        { kind: 'home rel+cwd', path: KEY_FILE, opts: { cwd: home } },
-      ]
-      for (const c of candidates) {
-        try {
-          const target = await ctx.fs.resolve(c.path, c.opts)
-          const raw = await ctx.fs.readText(target)
-          const trimmed = String(raw).trim()
-          if (trimmed !== '') { value = trimmed; attempts.push(c.kind + ': found'); break }
-          attempts.push(c.kind + ': empty file')
-        } catch (err) {
-          attempts.push(c.kind + ': ' + String((err && err.message) || err))
+      const svc = ctx.get('credentials')
+      if (svc === undefined) {
+        attempts.push('credential service absent')
+      } else {
+        const resolved = await svc.resolve(CRED_REF)
+        if (resolved && resolved.value) {
+          value = resolved.value
+          attempts.push('credential ' + CRED_REF + ': found (source ' + String(resolved.source) + ')')
+        } else {
+          attempts.push('credential ' + CRED_REF + ': not set')
         }
       }
+    } catch (err) {
+      attempts.push('credential ' + CRED_REF + ': ' + String((err && err.message) || err))
     }
-    keyDiag = 'settings ns=' + SETTINGS_NS + ' | ' + attempts.join(' | ')
-    keyCache = { text: value, at: Date.now() }
+    if (value === undefined) {
+      // File sources: cached 30s; the 401 path invalidates and re-reads.
+      if (fileKeyCache.text !== undefined && Date.now() - fileKeyCache.at < 30000) {
+        attempts.push('file cache: hit')
+        value = fileKeyCache.text
+      } else {
+        const root = resolveRoot()
+        const home = dshHome()
+        const candidates = [
+          { kind: 'workspace abs', path: root + '\\' + KEY_FILE, opts: undefined },
+          { kind: 'workspace rel+cwd', path: KEY_FILE, opts: { cwd: root } },
+          { kind: 'workspace rel', path: KEY_FILE, opts: undefined },
+          { kind: 'home abs', path: home + '\\' + KEY_FILE, opts: undefined },
+          { kind: 'home rel+cwd', path: KEY_FILE, opts: { cwd: home } },
+        ]
+        for (const c of candidates) {
+          try {
+            const target = await ctx.fs.resolve(c.path, c.opts)
+            const raw = await ctx.fs.readText(target)
+            const trimmed = String(raw).trim()
+            if (trimmed !== '') { value = trimmed; attempts.push(c.kind + ': found'); break }
+            attempts.push(c.kind + ': empty file')
+          } catch (err) {
+            attempts.push(c.kind + ': ' + String((err && err.message) || err))
+          }
+        }
+        fileKeyCache = { text: value, at: Date.now() }
+      }
+    }
+    keyDiag = 'credential ' + CRED_REF + ' | ' + attempts.join(' | ')
     return value
   }
 
@@ -270,13 +289,14 @@ export function apply(ctx) {
     if (opts.needsKey && !key) {
       return { ok: false, status: 401, text: 'Jina API key required for this command. Set it in the DSH settings page (Jina Tools) or put it in ' + KEY_FILE + ' in the session workspace or the dsh home directory (one line). Get a free key at https://jina.ai/?sui=apikey' + (keyDiag ? ' [key lookup: ' + keyDiag + ']' : '') }
     }
-    let res = await jinaRequest({ url: opts.url, method: opts.method || 'POST', headers, body: opts.body, timeoutMs: opts.timeoutMs, signal: opts.signal, ...(opts.proxy !== undefined ? { proxy: opts.proxy } : {}) })
+    const mk = () => ({ url: opts.url, method: opts.method || 'POST', headers, body: opts.body, timeoutMs: opts.timeoutMs, signal: opts.signal, ...(opts.proxy !== undefined ? { proxy: opts.proxy } : {}) })
+    let res = await jinaRequest(mk())
     if (!res.ok && res.status === 401 && !explicit) {
-      keyCache = { text: undefined, at: 0 }
+      fileKeyCache = { text: undefined, at: 0 }
       const fresh = await loadKey()
       if (fresh && fresh !== key) {
         headers.Authorization = 'Bearer ' + fresh
-        res = await jinaRequest({ url: opts.url, method: opts.method || 'POST', headers, body: opts.body, timeoutMs: opts.timeoutMs, signal: opts.signal, ...(opts.proxy !== undefined ? { proxy: opts.proxy } : {}) })
+        res = await jinaRequest(mk())
       }
     }
     return res
@@ -438,60 +458,6 @@ export function apply(ctx) {
     } catch (e) { /* fall through */ }
     return text
   }
-
-  // ---- settings namespace (feeds the web settings page) --------------------
-  const settingsService = ctx.get('settings')
-
-  /**
-   * Load `@deepseek-ai/schemastery` robustly.
-   *
-   * A git/npm install lands this package as a real directory inside the
-   * profile's node_modules, so a plain dynamic import resolves it through
-   * the profile's parent-walk (the healed `$DSH_HOME/profiles/node_modules`
-   * fallback carries schemastery as a dependency of the base bundle).
-   * A local `link:` install keeps this package's real path outside the
-   * profile, so the fallback anchors a createRequire at the dsh home
-   * instead — that walk always reaches `$DSH_HOME/profiles/node_modules`.
-   */
-  async function loadSchemastery() {
-    try {
-      const m = await import('@deepseek-ai/schemastery')
-      const z = m && (m.default ?? m.z ?? m)
-      if (z && typeof z.object === 'function') return z
-    } catch (err) { /* try the anchored fallback */ }
-    const req = createRequire(dshHome() + '/profiles/placeholder.cjs')
-    const entry = req.resolve('@deepseek-ai/schemastery')
-    const m = await import(pathToFileURL(entry).href)
-    const z = m && (m.default ?? m.z ?? m)
-    if (z === undefined || typeof z.object !== 'function') throw new Error('unexpected schemastery module shape')
-    return z
-  }
-
-  const setupSettings = async () => {
-    if (settingsService === undefined) return
-    let z
-    try {
-      z = await loadSchemastery()
-    } catch (err) {
-      try { ctx.logger.warn('dsh-jina: settings namespace disabled (schemastery unavailable): ' + String((err && err.message) || err)) } catch (e) { /* no logger */ }
-      return
-    }
-    try {
-      settingsScope = settingsService.register(
-        SETTINGS_NS,
-        z.object({ apiKey: z.string() }),
-        { base: { apiKey: '' } },
-      )
-    } catch (err) {
-      try { ctx.logger.warn('dsh-jina: settings namespace registration failed: ' + String((err && err.message) || err)) } catch (e) { /* no logger */ }
-    }
-  }
-  void setupSettings()
-
-  // A key saved from the settings page invalidates the cached key immediately.
-  ctx.on('settings/updated', (ns) => {
-    if (ns === SETTINGS_NS) keyCache = { text: undefined, at: 0 }
-  })
 
   // ---- tool registration ---------------------------------------------------
   const OUT = {

@@ -44,11 +44,11 @@ dsh --profile web
 每次工具调用按以下顺序找 key（任一命中即用）：
 
 1. 工具调用参数 `apiKey`
-2. 设置页保存的 key（settings 命名空间 `jina-tools`，持久化于 dsh 主目录的 settings 文件）
+2. 设置页保存的 key（credential 引用 `JINA_API_KEY`，由 dsh 凭据存储持久化，如 `~/.dsh/.credentials.yaml`）
 3. 会话工作区的 `jina-api-key.txt`
 4. dsh 主目录（`$DSH_HOME`，默认 `~/.dsh`）下的 `jina-api-key.txt`
 
-设置页保存新 key 后立即生效（无需重启）；HTTP 401 时也会自动重读文件并重试一次。
+设置页保存新 key 后立即生效（无需重启，每次调用即时解析）；HTTP 401 时也会自动重读文件并重试一次。凭据值只通过 `credentials.set` 上行，任何读取接口都不会回传明文。同时支持在页面上一键清除。
 
 ## 网络与代理（中国大陆用户）
 
@@ -76,6 +76,6 @@ jina-dsh-plugin/
 
 ## 开发说明
 
-- 主机插件只依赖 Node 内置模块与 dsh 主机服务（`fs`、`subprocess`、`tools`、`settings`），无第三方 npm 依赖；`@deepseek-ai/schemastery` 通过 dsh 的 profile 回退 node_modules 动态解析，缺失时自动降级为仅文件配置。
-- 客户端 bundle 直接提交（`ui/client.js`），无构建步骤，git 安装开箱即用。改 UI 后直接改该文件并重启即可。
+- 主机插件只依赖 Node 内置模块与 dsh 主机服务（`fs`、`subprocess`、`tools`、`credentials`），无第三方 npm 依赖；凭据走 dsh 原生的 credential seam（引用 `JINA_API_KEY`），任何 profile 组合都可以直接使用。
+- 客户端 bundle 直接提交（`ui/client.js`），无构建步骤，git 安装开箱即用。改 UI 后直接改该文件并重启即可。设置页通过标准的 `credentials.describe/set/unset` RPC 管理 key（这是唯一对第三方插件开放的配置通道——settings 命名空间对浏览器有白名单限制）。
 - 组合层遵循 dsh 约定：主机行 `dsh-jina` 注册模型工具；客户端行 `dsh-jina/ui` 由 host 的 client-modules 服务通过 `ui/package.json` 的 `dsh.client` 声明发现并接入 Web boot graph。
