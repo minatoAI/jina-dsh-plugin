@@ -525,7 +525,7 @@ export function apply(ctx) {
 
   ctx.tools.register({
     name: 'jina_search',
-    description: 'General web search via Jina AI, mirroring the jina-cli \'search\' command (default domain: web). For academic papers, prefer the dedicated tools: jina_search_arxiv (arXiv preprints — computer science, machine learning, math, physics) and jina_search_ssrn (SSRN — economics, finance, law, management); they return canonical paper links and do not need the type parameter. The type parameter additionally covers the images and blog domains. Supports a time filter, country/language hints and result count. Requires a Jina API key (set in the DSH settings page "Jina Tools", a key file, or the apiKey parameter).',
+    description: 'General web search via Jina AI, mirroring the jina-cli \'search\' command (default domain: web). For academic papers, prefer the dedicated tools: jina_search_arxiv (arXiv preprints — computer science, machine learning, math, physics) and jina_search_ssrn (SSRN — economics, finance, law, management); they return canonical paper links and do not need the type parameter. The type parameter additionally covers the images and blog domains. Supports a time filter, country/language hints and result count.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -550,7 +550,7 @@ export function apply(ctx) {
 
   ctx.tools.register({
     name: 'jina_search_arxiv',
-    description: 'Search academic papers and preprints on arXiv via Jina. Use this whenever the user asks for computer science, machine learning, mathematics, physics or other quantitative research papers, surveys or preprints. Results are canonical arxiv.org paper links with accurate snippets. Requires a Jina API key (set in the DSH settings page "Jina Tools", a key file, or the apiKey parameter).',
+    description: 'Search academic papers and preprints on arXiv via Jina. Use this whenever the user asks for computer science, machine learning, mathematics, physics or other quantitative research papers, surveys or preprints. Results are canonical arxiv.org paper links with accurate snippets.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -570,7 +570,7 @@ export function apply(ctx) {
 
   ctx.tools.register({
     name: 'jina_search_ssrn',
-    description: 'Search academic papers on SSRN (Social Science Research Network) via Jina. Use this whenever the user asks for economics, finance, law, management or other social-science working papers and publications. Results are canonical papers.ssrn.com links with accurate snippets. Requires a Jina API key (set in the DSH settings page "Jina Tools", a key file, or the apiKey parameter).',
+    description: 'Search academic papers on SSRN (Social Science Research Network) via Jina. Use this whenever the user asks for economics, finance, law, management or other social-science working papers and publications. Results are canonical papers.ssrn.com links with accurate snippets.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -626,7 +626,7 @@ export function apply(ctx) {
 
   ctx.tools.register({
     name: 'jina_screenshot',
-    description: 'Capture a screenshot of a web page via Jina (r.jina.ai), mirroring the jina-cli \'screenshot\' command. Returns the hosted screenshot URL. Requires a Jina API key.',
+    description: 'Capture a screenshot of a web page via Jina (r.jina.ai), mirroring the jina-cli \'screenshot\' command. Returns the hosted screenshot URL.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -679,7 +679,7 @@ export function apply(ctx) {
 
   ctx.tools.register({
     name: 'jina_expand',
-    description: 'Expand a search query into related queries via Jina, mirroring the jina-cli \'expand\' command. Requires a Jina API key.',
+    description: 'Expand a search query into related queries via Jina, mirroring the jina-cli \'expand\' command.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -705,7 +705,7 @@ export function apply(ctx) {
 
   ctx.tools.register({
     name: 'jina_embed',
-    description: 'Generate embeddings for texts via Jina Embeddings API, mirroring the jina-cli \'embed\' command. Requires a Jina API key. Default model: jina-embeddings-v5-text-small.',
+    description: 'Generate embeddings for texts via Jina Embeddings API, mirroring the jina-cli \'embed\' command. Default model: jina-embeddings-v5-text-small.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -736,7 +736,7 @@ export function apply(ctx) {
 
   ctx.tools.register({
     name: 'jina_rerank',
-    description: 'Rerank documents by relevance to a query via Jina Reranker API, mirroring the jina-cli \'rerank\' command. Requires a Jina API key. Default model: jina-reranker-v3.5.',
+    description: 'Rerank documents by relevance to a query via Jina Reranker API, mirroring the jina-cli \'rerank\' command. Default model: jina-reranker-v3.5.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -767,7 +767,7 @@ export function apply(ctx) {
 
   ctx.tools.register({
     name: 'jina_classify',
-    description: 'Classify texts into labels via Jina Classify API, mirroring the jina-cli \'classify\' command. Requires a Jina API key. Default model: jina-embeddings-v5-text-small.',
+    description: 'Classify texts into labels via Jina Classify API, mirroring the jina-cli \'classify\' command. Default model: jina-embeddings-v5-text-small.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -796,7 +796,7 @@ export function apply(ctx) {
 
   ctx.tools.register({
     name: 'jina_pdf',
-    description: 'Extract figures, tables and equations from a PDF via Jina (extract-pdf), mirroring the jina-cli \'pdf\' command. Provide either url or arxivId. Requires a Jina API key.',
+    description: 'Extract figures, tables and equations from a PDF via Jina (extract-pdf), mirroring the jina-cli \'pdf\' command. Provide either url or arxivId.',
     parameters: {
       type: 'object',
       additionalProperties: false,
