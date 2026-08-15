@@ -1,9 +1,10 @@
 # dsh-jina bundle layer — applied on top of a dsh profile's composition.
 #
 # Two rows:
-#   - dsh-jina      host plugin: the ten jina_* model tools, the network
-#                   transport, and the `jina-tools` settings namespace that
-#                   holds the API key (persisted by the host settings service).
+#   - dsh-jina      host plugin: the twelve jina_* model tools and the network
+#                   transport. The API key lives in the host credential seam
+#                   (reference JINA_API_KEY, written by the web settings page
+#                   via credentials.set) — this patch defines no settings.
 #   - dsh-jina/ui   dual-face client package: an empty host half plus the
 #                   prebuilt browser bundle that registers the "Jina Tools"
 #                   page in the web settings panel.

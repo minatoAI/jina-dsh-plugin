@@ -4,6 +4,28 @@
 
 A [Jina AI](https://jina.ai/) plugin (bundle) for DeepSeek Harness: it exposes the full jina-cli API surface to the model as tool calls, and adds a **Jina Tools** card under **Plugins → Configuration** in the Web settings (the same standard plugin configuration location as Terminal / Agent Loop / Web Search) to configure your API key.
 
+## Changelog
+
+### 0.3.0 (2026-08-15)
+
+- **feat** `jina_primer` rework: returns real context — host clock (ISO time / unix / timezone / UTC offset), network facts (public IP + location, best-effort, degrades on failure) and Jina account status (identity / balance). Parsing/formatting extracted into a pure module `primer.js`; 17 zero-dependency unit tests added (`npm test`).
+- **fix** Tool descriptions no longer list "API key required" as a prerequisite.
+
+### 0.2.0 (2026-08-14)
+
+- **feat** Dedicated academic search tools `jina_search_arxiv` / `jina_search_ssrn` (backed by `jina search --arxiv` / `--ssrn`); README gains a cross-comparison against the built-in `web_search`.
+- **feat** The **Jina Tools** card now shows the current key's identity and balance live (via `/api/dsh-jina/primer`, manual refresh; auto re-check on save/clear).
+- **feat** `jina_datetime` returns the extracted title / publish time instead of the raw JSON blob.
+- **fix** Proper JSON Schema tool parameters; settings UI moved to the standard plugin config slot (Settings → Plugins → Configuration).
+- **refactor** API key now managed through dsh's native credential seam (`JINA_API_KEY`).
+- **fix** Robust schemastery resolution for `link:` installs; `package.json` subpath exported.
+- **style** Fallback colors for settings-page theme tokens.
+- **docs** English README with language switcher links; corrected install repo URL and key acquisition link.
+
+### 0.1.0 (2026-08-14)
+
+- **feat** Initial release: dsh-jina bundle — 10 `jina_*` model tools (search / read / screenshot / embed / rerank / classify / pdf / expand / datetime / primer) + settings-page API key UI.
+
 ## Features
 
 Once installed, every session (all agent presets) gets 12 `jina_*` tools:
@@ -40,16 +62,16 @@ So the model **doesn't have to memorize parameters** to pick the right search do
 
 ## Installation
 
-Repository: https://github.com/minatoAI/jina-dsh-plugin
+Repository: https://github.com/minatoAI/jina-web-search-dsh-plugin
 
 The plugin is distributed as a [bundle](https://github.com/deepseek-ai/deepseek-harness/blob/main/docs/user/develop/basic/publish.md) and installed into a profile with `dsh plugin` (use `pnpm dsh` instead of `dsh` when running from a source checkout):
 
 ```sh
 # install from GitHub (no build script, so no allowBuilds grant needed)
-dsh plugin --profile web add github:minatoAI/jina-dsh-plugin
+dsh plugin --profile web add github:minatoAI/jina-web-search-dsh-plugin
 
 # more robust: pin to a commit so later pushes don't change the installed code
-dsh plugin --profile web add github:minatoAI/jina-dsh-plugin#<commit-sha>
+dsh plugin --profile web add github:minatoAI/jina-web-search-dsh-plugin#<commit-sha>
 
 # or install from a local folder (development)
 dsh plugin --profile web add ./jina-dsh-plugin
@@ -93,6 +115,9 @@ jina-dsh-plugin/
 ├── package.json       # manifest: "dsh": { "bundle": { "patch": "./cordis.patch.yml" } }
 ├── cordis.patch.yml   # composition layer: injects dsh-jina (host tool row) and dsh-jina/ui (client UI row)
 ├── index.js           # host plugin: 12 tools (incl. dedicated jina_search_arxiv / jina_search_ssrn academic search) + network transport + JINA_API_KEY credential resolution
+├── primer.js          # pure module: jina_primer parsing/formatting logic (zero deps, unit-testable)
+├── test/
+│   └── primer.test.js # jina_primer unit tests (auto-discovered by node --test)
 ├── ui/
 │   ├── package.json   # dsh.client declaration (platform: web)
 │   ├── index.js       # empty host half (keeps the loader row usable)

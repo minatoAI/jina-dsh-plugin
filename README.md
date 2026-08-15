@@ -4,6 +4,28 @@
 
 DeepSeek Harness 的 [Jina AI](https://jina.ai/) 插件（bundle）：把 jina-cli 的全部 API 能力以模型工具的形式装进 dsh，并在 Web 设置的**插件 → 配置**页（与 终端 / Agent 循环 / 网页搜索 相同的标准插件配置位置）提供 **Jina Tools** 卡片来配置 API key。
 
+## 更新日志
+
+### 0.3.0（2026-08-15）
+
+- **feat** `jina_primer` 重做：返回真实上下文——主机时钟（ISO 时间 / unix / 时区 / UTC 偏移）、网络事实（公网 IP 与位置，尽力而为，失败时降级）与 Jina 账户状态（身份 / 余额）。解析与格式化抽成纯函数模块 `primer.js`，新增 17 个零依赖单元测试（`npm test`）。
+- **fix** 工具描述不再把「需要 API key」列为前置条件。
+
+### 0.2.0（2026-08-14）
+
+- **feat** 新增 `jina_search_arxiv` / `jina_search_ssrn` 专用学术检索工具（对应 `jina search --arxiv` / `--ssrn`），工具名即用途；README 增加与内置 `web_search` 的交叉对比表。
+- **feat** 设置页 **Jina Tools** 卡片实时显示当前 key 的身份与余额（经 `/api/dsh-jina/primer`，可手动刷新；保存 / 清除 key 后自动重检）。
+- **feat** `jina_datetime` 返回提取出的标题 / 发布时间，不再吐原始 JSON 块。
+- **fix** 工具参数改为规范的 JSON Schema；设置 UI 移入标准插件配置位置（设置 → 插件 → 配置）。
+- **refactor** API key 改走 dsh 原生凭据通道（`JINA_API_KEY` credential seam）。
+- **fix** 增强 `link:` 安装的 schemastery 解析；导出 `package.json` 子路径。
+- **style** 设置页主题 token 增加降级颜色。
+- **docs** 新增英文 README 与语言切换链接；修正 README 安装命令的仓库地址与 key 获取链接。
+
+### 0.1.0（2026-08-14）
+
+- **feat** 首版：dsh-jina bundle——10 个 `jina_*` 模型工具（search / read / screenshot / embed / rerank / classify / pdf / expand / datetime / primer）+ 设置页 API key 配置 UI。
+
 ## 功能
 
 安装后所有会话（所有 agent preset）都会获得 12 个 `jina_*` 工具：
@@ -40,16 +62,16 @@ DeepSeek Harness 的 [Jina AI](https://jina.ai/) 插件（bundle）：把 jina-c
 
 ## 安装
 
-仓库地址：https://github.com/minatoAI/jina-dsh-plugin
+仓库地址：https://github.com/minatoAI/jina-web-search-dsh-plugin
 
 插件按 [bundle](https://github.com/deepseek-ai/deepseek-harness/blob/main/docs/user/develop/basic/publish.md) 方式分发，用 `dsh plugin` 安装进 profile（从源码 checkout 运行时用 `pnpm dsh` 代替 `dsh`）：
 
 ```sh
 # 从 GitHub 安装（本项目无 build 脚本，无需 allowBuilds 授权）
-dsh plugin --profile web add github:minatoAI/jina-dsh-plugin
+dsh plugin --profile web add github:minatoAI/jina-web-search-dsh-plugin
 
 # 更稳妥：固定到某个 commit，避免后续推送改变实际安装到的代码
-dsh plugin --profile web add github:minatoAI/jina-dsh-plugin#<commit-sha>
+dsh plugin --profile web add github:minatoAI/jina-web-search-dsh-plugin#<commit-sha>
 
 # 或本地文件夹安装（开发调试用）
 dsh plugin --profile web add ./jina-dsh-plugin
@@ -93,6 +115,9 @@ jina-dsh-plugin/
 ├── package.json       # manifest: "dsh": { "bundle": { "patch": "./cordis.patch.yml" } }
 ├── cordis.patch.yml   # 组合层：插入 dsh-jina（主机工具行）与 dsh-jina/ui（客户端 UI 行）
 ├── index.js           # 主机插件：12 个工具（含 jina_search_arxiv / jina_search_ssrn 专用学术检索）+ 网络传输 + JINA_API_KEY 凭据解析
+├── primer.js          # 纯函数模块：jina_primer 的解析 / 格式化逻辑（零依赖，可单测）
+├── test/
+│   └── primer.test.js # jina_primer 单元测试（node --test 自动发现）
 ├── ui/
 │   ├── package.json   # dsh.client 声明（platform: web）
 │   ├── index.js       # 空主机半身（保证 loader 行可用）
