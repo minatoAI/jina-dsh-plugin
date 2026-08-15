@@ -21,7 +21,7 @@ Once installed, every session (all agent presets) gets 12 `jina_*` tools:
 | `jina_rerank` | `jina rerank` | Rerank documents by relevance (default jina-reranker-v3.5) |
 | `jina_classify` | `jina classify` | Text classification |
 | `jina_pdf` | `jina pdf` | Extract figures/tables/equations from a PDF (arXiv ID supported) |
-| `jina_primer` | `jina primer` | Get current time / location / network context |
+| `jina_primer` | `jina primer` | Current context: host clock (ISO time/unix/timezone/UTC offset), network facts (public IP + location, best-effort) and Jina account status (identity/balance) |
 
 ## Field tests (cross-checked against the built-in web_search)
 
@@ -106,3 +106,16 @@ jina-dsh-plugin/
 - The host plugin only depends on Node built-ins and dsh host services (`fs`, `subprocess`, `tools`, `credentials`) — no third-party npm dependencies; credentials go through dsh's native credential seam (referencing `JINA_API_KEY`), so it works with any profile composition out of the box.
 - The client bundle is committed directly (`ui/client.js`), no build step — git installs work as-is. To change the UI, edit that file and restart. The card registers into the `settings.plugin.item` slot declared by the Web settings package (Settings → Plugins → Configuration), the standard place for third-party plugin configuration; the key is managed via the standard `credentials.describe/set/unset` RPCs (the only configuration channel open to third-party plugins — the settings namespace is allowlist-restricted for browsers).
 - The composition layer follows dsh conventions: the host row `dsh-jina` registers model tools; the client row `dsh-jina/ui` is discovered by the host's client-modules service through the `dsh.client` declaration in `ui/package.json` and wired into the Web boot graph.
+
+## Tests
+
+Pure logic (primer parsing/formatting, etc.) is covered by the Node built-in test
+runner with zero dependencies:
+
+```sh
+npm test   # same as node --test (auto-discovers test/*.test.js)
+```
+
+Fixtures use real captured r.jina.ai / ipinfo.io response shapes; tests cover
+parse tolerance, time-fact derivation, text/JSON rendering and the
+"never prints undefined" contract.

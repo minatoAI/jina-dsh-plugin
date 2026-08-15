@@ -21,7 +21,7 @@ DeepSeek Harness 的 [Jina AI](https://jina.ai/) 插件（bundle）：把 jina-c
 | `jina_rerank` | `jina rerank` | 按相关性重排文档（默认 jina-reranker-v3.5） |
 | `jina_classify` | `jina classify` | 文本分类 |
 | `jina_pdf` | `jina pdf` | 从 PDF 提取图表/公式（支持 arXiv ID） |
-| `jina_primer` | `jina primer` | 获取当前时间/位置/网络上下文信息 |
+| `jina_primer` | `jina primer` | 获取当前上下文：主机时钟（ISO 时间/unix/时区/UTC 偏移）、网络事实（公网 IP 与位置，尽力而为）与 Jina 账户状态（身份/余额） |
 
 ## 效果实测（与内置 web_search 交叉对比）
 
@@ -106,3 +106,14 @@ jina-dsh-plugin/
 - 主机插件只依赖 Node 内置模块与 dsh 主机服务（`fs`、`subprocess`、`tools`、`credentials`），无第三方 npm 依赖；凭据走 dsh 原生的 credential seam（引用 `JINA_API_KEY`），任何 profile 组合都可以直接使用。
 - 客户端 bundle 直接提交（`ui/client.js`），无构建步骤，git 安装开箱即用。改 UI 后直接改该文件并重启即可。卡片注册进 Web 设置包声明的 `settings.plugin.item` 插槽（设置 → 插件 → 配置），这是第三方插件配置的标准位置；key 通过标准的 `credentials.describe/set/unset` RPC 管理（这是唯一对第三方插件开放的配置通道——settings 命名空间对浏览器有白名单限制）。
 - 组合层遵循 dsh 约定：主机行 `dsh-jina` 注册模型工具；客户端行 `dsh-jina/ui` 由 host 的 client-modules 服务通过 `ui/package.json` 的 `dsh.client` 声明发现并接入 Web boot graph。
+
+## 测试
+
+纯函数逻辑（primer 解析/格式化等）使用 Node 内置测试运行器，零依赖：
+
+```sh
+npm test   # 等价于 node --test（自动发现 test/*.test.js）
+```
+
+测试用真实抓取的 r.jina.ai / ipinfo.io 响应形状作为 fixture，覆盖解析容错、
+时间事实推导、文本/JSON 两种渲染与“不输出 undefined”等契约。

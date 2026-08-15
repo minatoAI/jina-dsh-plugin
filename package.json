@@ -17,7 +17,8 @@
     "ui/package.json",
     "ui/client.js",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "primer.js"
   ],
   "dsh": {
     "bundle": {
@@ -34,5 +35,8 @@
     "embedding",
     "rerank",
     "plugin"
-  ]
+  ],
+  "scripts": {
+    "test": "node --test"
+  }
 }

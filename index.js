@@ -26,6 +26,7 @@
  */
 
 import { homedir } from 'node:os'
+import { buildPrimer, formatPrimer, parseIpInfo, parseJinaRoot } from './primer.js'
 
 export const name = 'dsh-jina'
 
@@ -33,6 +34,7 @@ export const inject = ['fs', 'subprocess', 'tools']
 
 export function apply(ctx) {
   const READER = 'https://r.jina.ai/'
+  const IPINFO = 'https://ipinfo.io/json'
   const SEARCH = 'https://svip.jina.ai/'
   const API = 'https://api.jina.ai'
   const KEY_FILE = 'jina-api-key.txt'
@@ -829,18 +831,34 @@ export function apply(ctx) {
 
   ctx.tools.register({
     name: 'jina_primer',
-    description: 'Get context info (current time, location, network facts) via Jina (r.jina.ai), mirroring the jina-cli \'primer\' command. Works without an API key.',
-    parameters: { type: 'object', additionalProperties: false, properties: {} },
+    description: 'Get current context for time/location-aware answers: host clock (ISO time, unix, timezone, UTC offset), network facts (public IP and location, best-effort via ipinfo.io), and Jina account status (authenticated identity + credit balance from r.jina.ai). Sections that cannot be fetched are reported as unavailable; the tool never throws. Works without an API key.',
+    parameters: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        json: { type: 'boolean', description: 'Return the raw JSON data object instead of formatted text.' },
+      },
+    },
     output: OUT,
-    async execute(_args, exec) {
+    async execute(args, exec) {
       const signal = enterExec(exec)
-      const res = await callJina({
-        url: READER, method: 'GET',
-        headers: { Accept: 'application/json' },
-        body: undefined, timeoutMs: 60000, needsKey: false, signal,
-      })
-      if (!res.ok) return describeJinaError(res)
-      return res.text
+      const now = new Date()
+      // Best-effort parallel probes; one failing section must not fail the tool.
+      const [jinaRes, ipRes] = await Promise.all([
+        callJina({
+          url: READER, method: 'GET',
+          headers: { Accept: 'application/json' },
+          body: undefined, timeoutMs: 60000, needsKey: false, signal,
+        }),
+        jinaRequest({
+          url: IPINFO, method: 'GET',
+          headers: { Accept: 'application/json' },
+          body: undefined, timeoutMs: 10000, signal,
+        }),
+      ])
+      const jina = jinaRes && jinaRes.ok ? parseJinaRoot(jinaRes.text) : null
+      const network = ipRes && ipRes.ok ? parseIpInfo(ipRes.text) : null
+      return formatPrimer(buildPrimer({ now, jina, network }), args.json === true)
     },
   })
 
