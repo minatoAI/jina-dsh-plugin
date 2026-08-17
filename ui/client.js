@@ -3,9 +3,13 @@
 // Executing this script only REGISTERS its factory with the module system
 // (`window.__ModuleLoader__.load`). The factory materializes on first import
 // and returns a cordis client plugin that contributes a "Jina Tools" card to
-// the standard plugin configuration surface (Settings → Plugins → Configurable,
-// the `settings.plugin.item` list slot declared by the web settings package —
+// the standard plugin configuration surface (Settings → Plugins → Configure,
+// the `settings.plugin.item` KEYED slot declared by the web settings package —
 // the same surface that hosts the Terminal / Agent loop / Web search cards).
+// A keyed entry is keyed by the settings namespace the card edits, so the
+// card registers under `key: 'jina-tools'` — the same namespace the host half
+// (index.js) serves — and the tab renders the card only when both halves
+// agree on that namespace.
 //
 // The card manages the `JINA_API_KEY` credential through the standard
 // credentials RPC domain: values cross the wire only on save
@@ -236,11 +240,13 @@ window.__ModuleLoader__.load({
       var remote = ctx.get('remote')
       if (api === undefined || remote === undefined) return
       // Standard plugin-configuration card slot (Settings → Plugins →
-      // Configurable). `slots.inject` waits for the declarer package and
-      // unregisters automatically if the surface disappears.
+      // Configure). `slots.inject` waits for the declarer package and
+      // unregisters automatically if the surface disappears. Keyed by the
+      // settings namespace this card edits — 'jina-tools' — which the host
+      // half serves; the tab dispatches one entry per served namespace.
       ctx.slots.inject('settings.plugin.item', function () {
         return slots.register(
-          { name: 'settings.plugin.item', id: 'jina-tools', order: 30 },
+          { name: 'settings.plugin.item', key: 'jina-tools' },
           function (slotProps) {
             return React.createElement(JinaCard, { api: api, remote: remote })
           },

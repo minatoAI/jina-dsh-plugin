@@ -8,7 +8,11 @@
  * rerank / classify / pdf / primer). The API key lives in the host credential seam
  * under the reference `JINA_API_KEY` — the "Jina Tools" web settings page
  * writes it through `credentials.set`, and this plugin resolves it per
- * operation (the seam's contract: never cache across operations).
+ * operation (the seam's contract: never cache across operations). The web
+ * settings pairing: this host half serves the `jina-tools` settings
+ * namespace and the browser half registers its card for that namespace, so
+ * the Settings → Plugins tab (Settings → Plugins → Configure) renders the
+ * card only when the two halves agree.
  *
  * The API key is resolved per call in this order:
  *   1. the tool's own `apiKey` parameter,
@@ -906,5 +910,44 @@ export function apply(ctx) {
         res.end(JSON.stringify(payload))
       },
     })
+  })
+
+  // ---- web settings namespace ------------------------------------------------
+  // The web Settings → Plugins tab is keyed by the settings namespace a card
+  // edits and renders a card only for namespaces the Host serves. This
+  // registration makes the deployment's settings provider serve "jina-tools",
+  // pairing it with the "Jina Tools" card the browser half registers under
+  // `key: 'jina-tools'`. The card stores the API key through the credential
+  // seam — never the settings document — so the namespace is intentionally
+  // empty: no fields to render or store, it exists only to be served.
+  //
+  // Zero-dependency note: the settings service consumes a schemastery schema
+  // as a function (schema(value) → resolved value), serializes it through
+  // toJSON(), and walks type/dict/meta for secret redaction. A plain object
+  // covering exactly that surface (below) satisfies the runtime contract, so
+  // this plugin still imports nothing from the harness's package graph (an
+  // out-of-tree bundle at this location cannot resolve those imports).
+  // Profiles without a settings provider never mount the inject, and the
+  // plugin keeps working exactly as before — just without a served namespace.
+  const settingsNamespace = (value) => {
+    if (!/^[a-z][a-z0-9-]*$/.test(String(value))) {
+      throw new TypeError('settings namespace "' + String(value) + '" must match ^[a-z][a-z0-9-]*$')
+    }
+    return value
+  }
+
+  const EMPTY_SETTINGS_SCHEMA = Object.assign(
+    function (value) { return value === undefined || value === null ? {} : value },
+    {
+      type: 'object',
+      dict: {},
+      meta: {},
+      inner: undefined,
+      toJSON() { return { type: 'object' } },
+    },
+  )
+
+  ctx.inject(['settings'], (sctx) => {
+    sctx.settings.register(settingsNamespace('jina-tools'), EMPTY_SETTINGS_SCHEMA)
   })
 }
