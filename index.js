@@ -31,6 +31,7 @@
 
 import { homedir } from 'node:os'
 import { buildPrimer, formatPrimer, parseIpInfo, parseJinaRoot } from './primer.js'
+import { WEB_SEARCH_TOOL } from './tool-contracts.js'
 
 export const name = 'dsh-jina'
 
@@ -506,7 +507,7 @@ export function apply(ctx) {
     render(_args, value) { return [{ type: 'text', text: value }] },
   }
 
-  /** Shared executor for the jina_search* family (web / arxiv / ssrn). */
+  /** Shared executor for the search tools (jina_web_search / jina_search_arxiv / jina_search_ssrn). */
   async function runSearch(args, exec, fixedType) {
     const signal = enterExec(exec)
     const body = { q: String(args.query) }
@@ -530,24 +531,7 @@ export function apply(ctx) {
   }
 
   ctx.tools.register({
-    name: 'jina_search',
-    description: 'General web search via Jina AI, mirroring the jina-cli \'search\' command (default domain: web). For academic papers, prefer the dedicated tools: jina_search_arxiv (arXiv preprints — computer science, machine learning, math, physics) and jina_search_ssrn (SSRN — economics, finance, law, management); they return canonical paper links and do not need the type parameter. The type parameter additionally covers the images and blog domains. Supports a time filter, country/language hints and result count.',
-    parameters: {
-      type: 'object',
-      additionalProperties: false,
-      properties: {
-        query: { type: 'string', description: 'Search query.' },
-        type: { type: 'string', enum: ['web', 'arxiv', 'ssrn', 'images', 'blog'], description: 'Search domain. Default: web. For academic papers prefer the jina_search_arxiv / jina_search_ssrn tools.' },
-        num: { type: 'number', description: 'Number of results. Default: 5.' },
-        time: { type: 'string', enum: ['h', 'd', 'w', 'm', 'y'], description: 'Only results from the last hour/day/week/month/year.' },
-        location: { type: 'string', description: 'Location hint for search results.' },
-        gl: { type: 'string', description: 'Country code, e.g. us, de, jp.' },
-        hl: { type: 'string', description: 'Language code, e.g. en, zh-cn.' },
-        json: { type: 'boolean', description: 'Return the raw JSON response instead of formatted results.' },
-        apiKey: { type: 'string', description: 'Optional Jina API key override.' },
-      },
-      required: ['query'],
-    },
+    ...WEB_SEARCH_TOOL,
     output: OUT,
     async execute(args, exec) {
       return runSearch(args, exec)

@@ -201,7 +201,7 @@ window.__ModuleLoader__.load({
           React.createElement(Chevron, { open: open })),
         open
           ? React.createElement('div', { style: S.body },
-            React.createElement('p', { style: S.note }, 'jina_search / jina_read 等工具会优先使用这里保存的 key。免费 key 可在 ', React.createElement('a', { style: S.link, href: 'https://jina.ai/?sui=apikey', target: '_blank', rel: 'noreferrer' }, 'jina.ai'), ' 获取。'),
+            React.createElement('p', { style: S.note }, 'jina_web_search / jina_read 等工具会优先使用这里保存的 key。免费 key 可在 ', React.createElement('a', { style: S.link, href: 'https://jina.ai/?sui=apikey', target: '_blank', rel: 'noreferrer' }, 'jina.ai'), ' 获取。'),
             React.createElement('div', { style: S.row },
               React.createElement('input', {
                 style: S.input,
