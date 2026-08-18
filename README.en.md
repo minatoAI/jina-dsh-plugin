@@ -6,6 +6,17 @@ A [Jina AI](https://jina.ai/) plugin (bundle) for DeepSeek Harness: it exposes t
 
 ## Changelog
 
+### 0.4.0 (2026-08-18)
+
+- **feat** The web search tool is renamed `jina_search` → `jina_web_search` so the tool name itself signals "web search", matching the built-in `web_search` naming signal. The description is rewritten task-first with a when-to-use trigger: it opens with what it returns (optional summary + official-source-first source list), a `Use this whenever...` clause states when to pick it (time-sensitive content, news, time filters) and the division of labor with the built-in `web_search` (broader general/engineering coverage); the `query` parameter description now points to the `time` parameter for recency-sensitive searches.
+- **refactor** The tool's model-facing contract (name / description / parameters) is extracted into the pure data module `tool-contracts.js`, registered from `index.js` by spread; the settings-card note text is updated.
+- **test** New `test/tools.test.js` (TDD, red first) pins the model-facing contract of `jina_web_search` — the rename, task-first opening, when-to-use trigger, division of labor with the built-in `web_search`, official-source/time-filter differentiators, query guidance, and a description-length budget.
+
+### 0.3.1 (2026-08-18)
+
+- **fix** Adapt to dsh's keyed-slot contract: the `settings.plugin.item` slot (Settings → Plugins → Configuration) is now keyed by the settings namespace a card edits (following the `tool.call.toolview` convention), and the section dispatches only cards for namespaces the host serves.
+- **fix** The browser half registers the **Jina Tools** card under `key: 'jina-tools'`; the host half serves a matching `jina-tools` settings namespace (empty schema, zero-dependency — exists only to pair with the card; the API key still lives solely in the `JINA_API_KEY` credential seam), so the card renders only when both halves agree. Profiles without a settings provider never mount the injection and behave exactly as before.
+
 ### 0.3.0 (2026-08-15)
 
 - **feat** `jina_primer` rework: returns real context — host clock (ISO time / unix / timezone / UTC offset), network facts (public IP + location, best-effort, degrades on failure) and Jina account status (identity / balance). Parsing/formatting extracted into a pure module `primer.js`; 17 zero-dependency unit tests added (`npm test`).
@@ -32,7 +43,7 @@ Once installed, every session (all agent presets) gets 12 `jina_*` tools:
 
 | Tool | Corresponding jina-cli command | Description |
 | --- | --- | --- |
-| `jina_search` | `jina search` | General web search (default web domain; images / blog domains; time filter and region/language hints supported) |
+| `jina_web_search` | `jina search` | General web search (default web domain; images / blog domains; time filter and region/language hints supported) |
 | `jina_search_arxiv` | `jina search --arxiv` | arXiv preprint search (CS / ML / math / physics, etc.; returns canonical arxiv.org paper links) |
 | `jina_search_ssrn` | `jina search --ssrn` | SSRN paper search (economics / finance / law / management and other social sciences; returns papers.ssrn.com links) |
 | `jina_read` | `jina read` | Read a web page as clean markdown |
@@ -53,10 +64,10 @@ So the model **doesn't have to memorize parameters** to pick the right search do
 | --- | --- | --- | --- |
 | Academic search (arXiv) | `jina_search_arxiv` "retrieval augmented generation survey" → **9/9 all canonical arxiv.org links**: 2312.10997 (classic RAG survey), 2506.00054, 2410.12837, 2501.09136 (Agentic RAG), 2405.07437, 2504.08748, etc. — every result on-topic with accurate abstracts | Same query returned arXiv **mirror sites** (ezproxy.obspm.fr, ar5iv, sinoxiv.napstic.cn) and BibTeX links; no canonical links | ✅ jina wins: canonical links + precise recall |
 | Academic search (SSRN) | `jina_search_ssrn` "large language models financial markets" → **9/9 all papers.ssrn.com originals**: market sentiment prediction, LLM-simulated trading, AI herding, investor disagreement, etc. — highly relevant | No SSRN-specific search capability | ✅ jina wins: exclusive SSRN domain |
-| Chinese news / community / official sources | `jina_search` puts official sources (government / company sites) first, plus `time` filtering | Relevant results, but official sources not ranked first | ✅ jina better: authoritative sources first + time filter |
+| Chinese news / community / official sources | `jina_web_search` puts official sources (government / company sites) first, plus `time` filtering | Relevant results, but official sources not ranked first | ✅ jina better: authoritative sources first + time filter |
 | General academic search (no domain specified) | Default web domain covers Springer / IEEE / ACL moderately (use the dedicated tools above for academic search) | Broad coverage of Springer / IEEE / ACL | ✅ web_search better: use it for general academic search |
 
-**Conclusion / division of labor**: academic papers → `jina_search_arxiv` / `jina_search_ssrn`; time-sensitive Chinese news → `jina_search` (+ `time`); general academic / engineering docs → built-in `web_search`. They complement each other and cover all search scenarios.
+**Conclusion / division of labor**: academic papers → `jina_search_arxiv` / `jina_search_ssrn`; time-sensitive Chinese news → `jina_web_search` (+ `time`); general academic / engineering docs → built-in `web_search`. They complement each other and cover all search scenarios.
 
 > Note: the table is a one-round sampled comparison (not a strict benchmark); results depend on that day's network and query choices. Both toolchains work in practice; treat the conclusions as selection guidance.
 
