@@ -18,6 +18,8 @@
     "ui/client.js",
     "README.md",
     "README.en.md",
+    "change-log.md",
+    "change-log.en.md",
     "LICENSE",
     "primer.js",
     "tool-contracts.js"
